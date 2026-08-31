@@ -1,1 +1,0 @@
-# Salux-DesarrolloDeSoftware
