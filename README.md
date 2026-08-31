@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Salux Backend
 
 API REST del sistema de gestión de turnos médicos Salux, construida con Express, Prisma y MySQL.
@@ -91,3 +92,6 @@ docker compose up --build
 3. Antes de arrancar, corré las migraciones: `npm run db:migrate`.
 4. Comando de arranque: `npm start`.
 5. Asegurate de que `NODE_ENV=production` para que los errores no expongan detalles internos.
+=======
+# Salux-DesarrolloDeSoftware
+>>>>>>> 4aafecd72a2bc1ec03cca620725d704358d013c8
