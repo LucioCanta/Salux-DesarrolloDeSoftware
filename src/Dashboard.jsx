@@ -91,6 +91,7 @@ function Dashboard({ usuario, onLogout }) {
   const [ahora] = useState(() => Date.now());
   const [mostrarModalTurno, setMostrarModalTurno] = useState(false);
   const [mostrarModalAlta, setMostrarModalAlta] = useState(false);
+  const [mostrarConfirmarSalir, setMostrarConfirmarSalir] = useState(false);
 
   const cargarMisTurnos = () => {
     api.misTurnos()
@@ -346,7 +347,7 @@ function Dashboard({ usuario, onLogout }) {
               <span className="font-medium hidden sm:inline" style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>{usuario.nombre}</span>
             </div>
 
-            <button onClick={onLogout} className="text-[#DC2626] font-medium hover:underline px-2 py-1" style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>Salir</button>
+            <button onClick={() => setMostrarConfirmarSalir(true)} className="text-[#DC2626] font-medium hover:underline px-2 py-1" style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>Salir</button>
           </div>
 
           {/* Botón hamburguesa — visible solo en mobile/tablet */}
@@ -527,7 +528,7 @@ function Dashboard({ usuario, onLogout }) {
             <div className={`border-t my-2 ${altoContraste ? 'border-black' : 'border-slate-700'}`} />
 
             <button
-              onClick={onLogout}
+              onClick={() => { setMostrarConfirmarSalir(true); setMenuMobileAbierto(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition text-[#DC2626] ${altoContraste ? 'hover:bg-slate-100' : 'hover:bg-red-500/10'}`}
               style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
             >
@@ -1046,6 +1047,29 @@ function Dashboard({ usuario, onLogout }) {
 
       {mostrarModalAlta && (
         <AdminAltaModal onClose={() => setMostrarModalAlta(false)} />
+      )}
+
+      {mostrarConfirmarSalir && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm text-slate-100 p-6 space-y-4">
+            <h2 className="font-bold text-lg">¿Cerrar sesión?</h2>
+            <p className="text-slate-400 text-sm">Vas a tener que volver a ingresar tu email y contraseña para entrar de nuevo.</p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setMostrarConfirmarSalir(false)}
+                className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 font-medium transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={onLogout}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition"
+              >
+                Sí, salir
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
