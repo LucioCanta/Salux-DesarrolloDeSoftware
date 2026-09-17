@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  idUsuario   Int            @id @default(autoincrement())
+  email       String         @unique
+  dni         String         @unique
+  contrasena  String
+  nomYape     String
+  activo      Boolean        @default(true) 
+  
+  paciente    Paciente?
+  medico      Medico?
+  admin       Administrador?
+}
+
+model Paciente {
+  idPaciente  Int      @id @default(autoincrement())
+  obraSocial  String?
+  telefono    String?
+  
+  usuarioId   Int      @unique
+  usuario     Usuario  @relation(fields: [usuarioId], references: [idUsuario])
+  
+  turnos      Turno[]
+}
+
+model Medico {
+  idMedico    Int      @id @default(autoincrement())
+  matricula   String   @unique
+  consultorio String?
+  
+  usuarioId   Int      @unique
+  usuario     Usuario  @relation(fields: [usuarioId], references: [idUsuario])
+  
+  turnos      Turno[]
+  especialidades Especialidad[] 
+}
+
+model Administrador {
+  idAdmin     Int      @id @default(autoincrement())
+  usuarioId   Int      @unique
+  usuario     Usuario  @relation(fields: [usuarioId], references: [idUsuario])
+}
+
+model Especialidad {
+  idEspecialidad Int      @id @default(autoincrement())
+  nombre         String
+  medicos        Medico[] 
+}
+
+model Turno {
+  idTurno     Int      @id @default(autoincrement())
+  fechaYhora  DateTime
+  estado      EstadoTurno @default(PENDIENTE)
+  
+  pacienteId  Int
+  paciente    Paciente @relation(fields: [pacienteId], references: [idPaciente])
+  
+  medicoId    Int
+  medico      Medico   @relation(fields: [medicoId], references: [idMedico])
+
+  @@unique([medicoId, fechaYhora])
+}
+
+enum EstadoTurno {
+  PENDIENTE
+  CONFIRMADO
+  CANCELADO
+  FINALIZADO
+}
