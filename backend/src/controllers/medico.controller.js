@@ -13,10 +13,10 @@ const crearMedico = async (req, res) => {
     ]);
 
     if (usuarioExistente) {
-      return res.status(400).json({ ok: false, message: 'El email o DNI ya están registrados' });
+      return res.status(409).json({ ok: false, message: 'El email o DNI ya están registrados' });
     }
     if (matriculaExistente) {
-      return res.status(400).json({ ok: false, message: 'Esa matrícula ya está registrada' });
+      return res.status(409).json({ ok: false, message: 'Esa matrícula ya está registrada' });
     }
 
     // 4. Encriptamos la contraseña
@@ -69,7 +69,7 @@ const crearMedico = async (req, res) => {
     }
     // Carrera entre dos altas simultáneas con el mismo email/dni/matrícula
     if (error.code === 'P2002') {
-      return res.status(400).json({ ok: false, message: 'El email, DNI o matrícula ya están registrados' });
+      return res.status(409).json({ ok: false, message: 'El email, DNI o matrícula ya están registrados' });
     }
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }

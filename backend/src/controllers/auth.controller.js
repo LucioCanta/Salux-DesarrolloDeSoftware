@@ -19,7 +19,7 @@ const register = async (req, res) => {
     });
 
     if (usuarioExistente) {
-      return res.status(400).json({ ok: false, message: 'El email o DNI ya está registrado' });
+      return res.status(409).json({ ok: false, message: 'El email o DNI ya está registrado' });
     }
 
     // 3. Hasheamos la contraseña con bcrypt (12 salt rounds como pide el documento)
@@ -50,7 +50,7 @@ const register = async (req, res) => {
     console.error(error);
     // Carrera entre dos registros simultáneos con el mismo email/dni
     if (error.code === 'P2002') {
-      return res.status(400).json({ ok: false, message: 'El email o DNI ya está registrado' });
+      return res.status(409).json({ ok: false, message: 'El email o DNI ya está registrado' });
     }
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }

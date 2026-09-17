@@ -51,8 +51,8 @@ model Administrador {
 
 model Especialidad {
   idEspecialidad Int      @id @default(autoincrement())
-  nombre         String
-  medicos        Medico[] 
+  nombre         String   @unique
+  medicos        Medico[]
 }
 
 model Turno {
@@ -67,6 +67,7 @@ model Turno {
   medico      Medico   @relation(fields: [medicoId], references: [idMedico])
 
   @@unique([medicoId, fechaYhora])
+  @@unique([pacienteId, fechaYhora])
 }
 
 enum EstadoTurno {

@@ -1,11 +1,17 @@
 const prisma = require('../config/prisma');
 
+// Duración asumida de un turno. No hay un campo de duración en el modelo
+// todavía; hasta que se agregue, usamos este valor fijo para detectar
+// solapamientos en la agenda de un médico.
+const DURACION_TURNO_MINUTOS = 30;
+
 // 1. Crear un turno nuevo
 const crearTurno = async (req, res) => {
   try {
     // medicoId y fechaYhora ya vienen validados (y fechaYhora garantizada a futuro) por Zod
     const { medicoId, fechaYhora } = req.body;
     const usuarioId = req.usuario.id;
+    const inicio = new Date(fechaYhora);
 
     const [paciente, medico] = await Promise.all([
       prisma.paciente.findUnique({ where: { usuarioId: usuarioId } }),
@@ -19,13 +25,43 @@ const crearTurno = async (req, res) => {
       return res.status(404).json({ ok: false, message: 'Tu usuario no tiene un perfil de paciente asociado' });
     }
 
-    if (!medico || !medico.usuario.activo) {
+    if (!medico) {
       return res.status(404).json({ ok: false, message: 'El médico indicado no existe' });
+    }
+
+    if (!medico.usuario.activo) {
+      return res.status(422).json({ ok: false, message: 'Ese médico no está disponible actualmente' });
+    }
+
+    // El paciente no puede tener dos turnos en el mismo horario, aunque sea con médicos distintos
+    const turnoPacienteMismaHora = await prisma.turno.findFirst({
+      where: { pacienteId: paciente.idPaciente, fechaYhora: inicio, estado: { not: 'CANCELADO' } }
+    });
+    if (turnoPacienteMismaHora) {
+      return res.status(409).json({ ok: false, message: 'Ya tenés un turno reservado en ese mismo horario' });
+    }
+
+    // El médico no puede tener dos turnos que se superpongan en el tiempo
+    // (una reserva "ocupa" DURACION_TURNO_MINUTOS a partir de su hora de inicio)
+    const ventanaInicio = new Date(inicio.getTime() - DURACION_TURNO_MINUTOS * 60 * 1000);
+    const ventanaFin = new Date(inicio.getTime() + DURACION_TURNO_MINUTOS * 60 * 1000);
+    const turnoSuperpuesto = await prisma.turno.findFirst({
+      where: {
+        medicoId: medico.idMedico,
+        estado: { not: 'CANCELADO' },
+        fechaYhora: { gt: ventanaInicio, lt: ventanaFin }
+      }
+    });
+    if (turnoSuperpuesto) {
+      return res.status(409).json({
+        ok: false,
+        message: `Ese médico ya tiene un turno dentro de los ${DURACION_TURNO_MINUTOS} minutos de ese horario`
+      });
     }
 
     const nuevoTurno = await prisma.turno.create({
       data: {
-        fechaYhora: new Date(fechaYhora),
+        fechaYhora: inicio,
         pacienteId: paciente.idPaciente,
         medicoId: medico.idMedico
       },
@@ -49,7 +85,13 @@ const crearTurno = async (req, res) => {
 
   } catch (error) {
     console.error(error);
+    // Red de seguridad ante una carrera entre dos reservas simultáneas que
+    // los chequeos de arriba no llegaron a atajar a tiempo.
     if (error.code === 'P2002') {
+      const indice = Array.isArray(error.meta?.target) ? error.meta.target.join(',') : String(error.meta?.target || '');
+      if (indice.includes('pacienteId')) {
+        return res.status(409).json({ ok: false, message: 'Ya tenés un turno reservado en ese mismo horario' });
+      }
       return res.status(409).json({ ok: false, message: 'Ese médico ya tiene un turno reservado en ese horario' });
     }
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
@@ -138,9 +180,10 @@ const actualizarEstadoTurno = async (req, res) => {
       return res.status(403).json({ ok: false, message: 'Como paciente solo podés cancelar tu turno' });
     }
 
-    // Los estados finales no admiten más transiciones (evita "revivir" un turno ya cerrado)
+    // Los estados finales no admiten más transiciones (evita "revivir" un turno ya cerrado).
+    // 422: la petición está bien formada, pero viola una regla de negocio (máquina de estados).
     if (turno.estado === 'FINALIZADO' || turno.estado === 'CANCELADO') {
-      return res.status(409).json({
+      return res.status(422).json({
         ok: false,
         message: `El turno ya está ${turno.estado.toLowerCase()} y no admite más cambios`
       });
