@@ -1,0 +1,41 @@
+services:
+  mysql-db:
+    image: mysql:8.0
+    container_name: salux_db_container
+    restart: always
+    environment:
+      # Lee MYSQL_ROOT_PASSWORD desde tu archivo .env local.
+      # Nunca hardcodees la contraseña aquí.
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: salux_db
+    ports:
+      - "3306:3306"
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    # Healthcheck para que el backend no arranque antes de que MySQL esté listo
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: salux_backend_container
+    restart: always
+    env_file:
+      - .env
+    environment:
+      # Dentro de la red de docker-compose, la DB se resuelve por el nombre del servicio, no "localhost".
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@mysql-db:3306/salux_db
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    # Aplica migraciones pendientes antes de levantar el servidor
+    command: sh -c "npx prisma migrate deploy && node src/app.js"
+
+volumes:
+  mysql_data:
