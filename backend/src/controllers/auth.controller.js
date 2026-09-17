@@ -15,6 +15,30 @@ function derivarRol(usuario) {
   return usuario.admin ? 'admin' : usuario.medico ? 'medico' : 'paciente';
 }
 
+// Arma el objeto de perfil que se muestra/edita en la Vista de Perfil —
+// incluye los campos propios de cada rol además de los comunes a Usuario.
+function serializarPerfil(usuario, rol) {
+  const perfil = {
+    id: usuario.idUsuario,
+    email: usuario.email,
+    nombre: usuario.nomYape,
+    dni: usuario.dni,
+    rol,
+  };
+
+  if (rol === 'paciente' && usuario.paciente) {
+    perfil.obraSocial = usuario.paciente.obraSocial || '';
+    perfil.telefono = usuario.paciente.telefono || '';
+  }
+
+  if (rol === 'medico' && usuario.medico) {
+    perfil.matricula = usuario.medico.matricula;
+    perfil.consultorio = usuario.medico.consultorio || '';
+  }
+
+  return perfil;
+}
+
 // Arma el Access Token (corta duración, va en el body de la respuesta) y el
 // Refresh Token (larga duración, va SOLO en una cookie httpOnly) para un
 // usuario ya autenticado.
@@ -205,8 +229,59 @@ const obtenerPerfil = async (req, res) => {
 
     res.json({
       ok: true,
-      usuario: { id: usuario.idUsuario, email: usuario.email, nombre: usuario.nomYape, rol }
+      usuario: serializarPerfil(usuario, rol)
     });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+};
+
+// Actualiza los datos personales comunes a cualquier rol (por ahora, el
+// nombre). Los campos propios de un rol —obraSocial/telefono de un
+// paciente— se editan en su propio endpoint (ver paciente.controller.js).
+const actualizarPerfil = async (req, res) => {
+  try {
+    const { nomYape } = req.body;
+
+    const usuario = await prisma.usuario.update({
+      where: { idUsuario: req.usuario.id },
+      data: { nomYape },
+      include: { paciente: true, medico: true, admin: true }
+    });
+
+    res.json({
+      ok: true,
+      message: 'Perfil actualizado con éxito',
+      usuario: serializarPerfil(usuario, req.usuario.rol)
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+};
+
+const cambiarContrasena = async (req, res) => {
+  try {
+    const { contrasenaActual, contrasenaNueva } = req.body;
+
+    const usuario = await prisma.usuario.findUnique({ where: { idUsuario: req.usuario.id } });
+    if (!usuario) {
+      return res.status(401).json({ ok: false, message: 'Usuario no válido' });
+    }
+
+    const passwordValida = await bcrypt.compare(contrasenaActual, usuario.contrasena);
+    if (!passwordValida) {
+      return res.status(401).json({ ok: false, message: 'La contraseña actual es incorrecta' });
+    }
+
+    const hashNuevo = await bcrypt.hash(contrasenaNueva, 12);
+    await prisma.usuario.update({
+      where: { idUsuario: usuario.idUsuario },
+      data: { contrasena: hashNuevo }
+    });
+
+    res.json({ ok: true, message: 'Contraseña actualizada con éxito' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
@@ -218,5 +293,7 @@ module.exports = {
   login,
   refresh,
   logout,
-  obtenerPerfil
+  obtenerPerfil,
+  actualizarPerfil,
+  cambiarContrasena
 };

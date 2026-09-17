@@ -5,7 +5,7 @@ const router = express.Router();
 const authController = require('../controllers/auth.controller');
 const { verificarToken } = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
-const { registerSchema, loginSchema } = require('../schemas/auth.schema');
+const { registerSchema, loginSchema, actualizarPerfilSchema, cambiarContrasenaSchema } = require('../schemas/auth.schema');
 
 // 2. Rutas Públicas (No necesitan token)
 router.post('/register', validate(registerSchema), authController.register);
@@ -16,6 +16,8 @@ router.post('/logout', authController.logout);
 
 // 3. Rutas Privadas (Pasan por verificarToken antes de llegar al controlador)
 router.get('/perfil', verificarToken, authController.obtenerPerfil);
+router.patch('/perfil', verificarToken, validate(actualizarPerfilSchema), authController.actualizarPerfil);
+router.patch('/perfil/contrasena', verificarToken, validate(cambiarContrasenaSchema), authController.cambiarContrasena);
 
 // 4. Exportamos el router para que app.js lo pueda usar
 module.exports = router;

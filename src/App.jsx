@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Dashboard from './Dashboard';
-import { api, getUsuarioGuardado, guardarSesion, borrarSesion } from './api';
+import { api, getUsuarioGuardado, guardarSesion, borrarSesion, actualizarUsuarioGuardado } from './api';
 
 function App() {
   const [usuario, setUsuario] = useState(() => getUsuarioGuardado());
@@ -96,8 +96,13 @@ function App() {
     );
   }
 
+  const handleUsuarioActualizado = (usuarioActualizado) => {
+    setUsuario(usuarioActualizado);
+    actualizarUsuarioGuardado(usuarioActualizado);
+  };
+
   if (usuario) {
-    return <Dashboard usuario={usuario} onLogout={handleLogout} />;
+    return <Dashboard usuario={usuario} onLogout={handleLogout} onUsuarioActualizado={handleUsuarioActualizado} />;
   }
 
   return (

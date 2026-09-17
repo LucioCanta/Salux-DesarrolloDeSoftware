@@ -15,4 +15,13 @@ const loginSchema = z.object({
   contrasena: z.string().min(1, 'La contraseña es obligatoria'),
 });
 
-module.exports = { registerSchema, loginSchema };
+const actualizarPerfilSchema = z.object({
+  nomYape: z.string().trim().min(1, 'El nombre es obligatorio').max(191),
+});
+
+const cambiarContrasenaSchema = z.object({
+  contrasenaActual: z.string().min(1, 'Ingresá tu contraseña actual'),
+  contrasenaNueva: z.string().min(8, 'La contraseña nueva debe tener al menos 8 caracteres'),
+});
+
+module.exports = { registerSchema, loginSchema, actualizarPerfilSchema, cambiarContrasenaSchema };

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from './api';
 import NuevoTurnoModal from './NuevoTurnoModal';
 import AdminAltaModal from './AdminAltaModal';
+import PerfilModal from './PerfilModal';
 
 const ESTADO_TEXTO = { PENDIENTE: 'Pendiente', CONFIRMADO: 'Confirmado', CANCELADO: 'Cancelado', FINALIZADO: 'Finalizado' };
 
@@ -67,7 +68,7 @@ function iniciales(nombre) {
   return nombre.trim().split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 }
 
-function Dashboard({ usuario, onLogout }) {
+function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   const [vistaActual, setVistaActual] = useState('dashboard');
   const [filtroEstado, setFiltroEstado] = useState('Todos');
 
@@ -91,6 +92,7 @@ function Dashboard({ usuario, onLogout }) {
   const [ahora] = useState(() => Date.now());
   const [mostrarModalTurno, setMostrarModalTurno] = useState(false);
   const [mostrarModalAlta, setMostrarModalAlta] = useState(false);
+  const [mostrarModalPerfil, setMostrarModalPerfil] = useState(false);
   const [mostrarConfirmarSalir, setMostrarConfirmarSalir] = useState(false);
 
   const cargarMisTurnos = () => {
@@ -342,10 +344,14 @@ function Dashboard({ usuario, onLogout }) {
             </div>
 
             {/* Perfil de usuario */}
-            <div className={`flex items-center space-x-2 border-l pl-3 ${altoContraste ? 'border-black' : 'border-slate-300 dark:border-slate-700'}`}>
+            <button
+              onClick={() => setMostrarModalPerfil(true)}
+              className={`flex items-center space-x-2 border-l pl-3 hover:opacity-80 transition ${altoContraste ? 'border-black' : 'border-slate-300 dark:border-slate-700'}`}
+              title="Ver mi perfil"
+            >
               <div className="w-8 h-8 rounded-full bg-blue-100 text-[#2563EB] font-bold flex items-center justify-center text-xs">{iniciales(usuario.nombre)}</div>
               <span className="font-medium hidden sm:inline" style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>{usuario.nombre}</span>
-            </div>
+            </button>
 
             <button onClick={() => setMostrarConfirmarSalir(true)} className="text-[#DC2626] font-medium hover:underline px-2 py-1" style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>Salir</button>
           </div>
@@ -524,6 +530,17 @@ function Dashboard({ usuario, onLogout }) {
                 Mayor
               </button>
             </div>
+
+            <div className={`border-t my-2 ${altoContraste ? 'border-black' : 'border-slate-700'}`} />
+
+            <button
+              onClick={() => { setMostrarModalPerfil(true); setMenuMobileAbierto(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${altoContraste ? 'hover:bg-slate-100' : 'hover:bg-slate-800/60'}`}
+              style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
+            >
+              <div className="w-5 h-5 shrink-0 rounded-full bg-blue-100 text-[#2563EB] font-bold flex items-center justify-center text-[10px]">{iniciales(usuario.nombre)}</div>
+              Mi perfil
+            </button>
 
             <div className={`border-t my-2 ${altoContraste ? 'border-black' : 'border-slate-700'}`} />
 
@@ -1047,6 +1064,14 @@ function Dashboard({ usuario, onLogout }) {
 
       {mostrarModalAlta && (
         <AdminAltaModal onClose={() => setMostrarModalAlta(false)} />
+      )}
+
+      {mostrarModalPerfil && (
+        <PerfilModal
+          usuario={usuario}
+          onClose={() => setMostrarModalPerfil(false)}
+          onActualizado={onUsuarioActualizado}
+        />
       )}
 
       {mostrarConfirmarSalir && (

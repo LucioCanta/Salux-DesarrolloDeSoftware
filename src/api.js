@@ -32,6 +32,12 @@ export function borrarSesion() {
   localStorage.removeItem(USUARIO_KEY);
 }
 
+// Actualiza solo el usuario cacheado en localStorage (ej: cambió su nombre
+// desde la Vista de Perfil), sin tocar el Access Token en memoria.
+export function actualizarUsuarioGuardado(usuario) {
+  localStorage.setItem(USUARIO_KEY, JSON.stringify(usuario));
+}
+
 async function fetchJson(path, { method = 'GET', body, credentialsInclude = false, headers = {} } = {}) {
   let res;
   try {
@@ -118,6 +124,10 @@ export const api = {
   refrescarSesion,
   logout: () => request('/auth/logout', { method: 'POST', auth: false }),
   perfil: () => request('/auth/perfil'),
+  actualizarPerfil: (nomYape) => request('/auth/perfil', { method: 'PATCH', body: { nomYape } }),
+  actualizarPerfilPaciente: (datos) => request('/pacientes/perfil', { method: 'PATCH', body: datos }),
+  cambiarContrasena: (contrasenaActual, contrasenaNueva) =>
+    request('/auth/perfil/contrasena', { method: 'PATCH', body: { contrasenaActual, contrasenaNueva } }),
   misTurnos: () => request('/turnos/mis-turnos'),
   cancelarTurno: (idTurno) =>
     request(`/turnos/${idTurno}`, { method: 'PATCH', body: { estado: 'CANCELADO' } }),
