@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from './api';
+import NuevoTurnoModal from './NuevoTurnoModal';
 
 const ESTADO_TEXTO = { PENDIENTE: 'Pendiente', CONFIRMADO: 'Confirmado', CANCELADO: 'Cancelado', FINALIZADO: 'Finalizado' };
 
@@ -69,15 +70,27 @@ function Dashboard({ usuario, onLogout }) {
   const [cargandoTurnos, setCargandoTurnos] = useState(() => esPaciente);
   const [errorTurnos, setErrorTurnos] = useState('');
   const [ahora] = useState(() => Date.now());
+  const [mostrarModalTurno, setMostrarModalTurno] = useState(false);
 
-  useEffect(() => {
-    if (!esPaciente) return;
+  const cargarMisTurnos = () => {
     api.misTurnos()
       .then(({ data }) => setListaTurnos(data.map(formatearTurno)))
       .catch((err) => setErrorTurnos(err.message))
       .finally(() => setCargandoTurnos(false));
+  };
+
+  useEffect(() => {
+    if (!esPaciente) return;
+    cargarMisTurnos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const turnoCreado = () => {
+    setMostrarModalTurno(false);
+    setVistaActual('mis-turnos');
+    setCargandoTurnos(true);
+    cargarMisTurnos();
+  };
 
   const cancelarTurno = async (id) => {
     try {
@@ -198,7 +211,7 @@ function Dashboard({ usuario, onLogout }) {
                 Inicio
               </button>
               {esPaciente && (
-                <button onClick={() => alert('Wizard de solicitar turno en desarrollo')} className="px-3 py-1.5 rounded-lg hover:text-[#2563EB] transition">
+                <button onClick={() => setMostrarModalTurno(true)} className="px-3 py-1.5 rounded-lg hover:text-[#2563EB] transition">
                   Solicitar turno
                 </button>
               )}
@@ -323,7 +336,7 @@ function Dashboard({ usuario, onLogout }) {
 
             {esPaciente && (
               <button
-                onClick={() => { alert('Wizard de solicitar turno en desarrollo'); setMenuMobileAbierto(false); }}
+                onClick={() => { setMostrarModalTurno(true); setMenuMobileAbierto(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${altoContraste ? 'hover:bg-slate-100' : 'hover:bg-slate-800/60'}`}
                 style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
               >
@@ -615,7 +628,7 @@ function Dashboard({ usuario, onLogout }) {
               <p className="text-slate-400 text-sm">{turnosActivos.length} turno{turnosActivos.length === 1 ? '' : 's'} activo{turnosActivos.length === 1 ? '' : 's'}</p>
             </div>
             <button
-              onClick={() => alert('Wizard de nuevo turno')}
+              onClick={() => setMostrarModalTurno(true)}
               className={`font-semibold px-4 py-2.5 rounded-xl shadow transition ${
                 altoContraste ? 'bg-black text-white hover:bg-slate-800' : 'bg-blue-600 hover:bg-blue-700 text-white'
               }`}
@@ -775,7 +788,7 @@ function Dashboard({ usuario, onLogout }) {
             <div>
               <h3 className="font-bold mb-4" style={{ fontSize: modoAdultoMayor ? '24px' : '18px' }}>¿Qué querés hacer hoy?</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div onClick={() => alert('Asistente de solicitar turno')} className={`p-5 rounded-xl border shadow-sm cursor-pointer transition ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 hover:border-blue-500'}`}>
+                <div onClick={() => setMostrarModalTurno(true)} className={`p-5 rounded-xl border shadow-sm cursor-pointer transition ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 hover:border-blue-500'}`}>
                   <div className="w-10 h-10 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold mb-3">📅</div>
                   <h4 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '20px' : '16px' }}>Solicitar turno</h4>
                   <p className="text-slate-400" style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>Reserva una nueva cita médica</p>
@@ -811,6 +824,10 @@ function Dashboard({ usuario, onLogout }) {
             </div>
           )}
         </main>
+      )}
+
+      {mostrarModalTurno && (
+        <NuevoTurnoModal onClose={() => setMostrarModalTurno(false)} onCreado={turnoCreado} />
       )}
     </div>
   );
