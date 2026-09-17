@@ -36,6 +36,23 @@ function formatearTurnoAdmin(t) {
   };
 }
 
+function formatearTurnoMedico(t) {
+  const fecha = new Date(t.fechaYhora);
+  const fechaTexto = fecha.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const horaTexto = fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
+  return {
+    id: t.idTurno,
+    paciente: t.paciente?.usuario?.nomYape || 'Paciente',
+    email: t.paciente?.usuario?.email || '',
+    obraSocial: t.paciente?.obraSocial || 'Sin obra social registrada',
+    telefono: t.paciente?.telefono || 'Sin teléfono registrado',
+    fecha: fechaTexto.charAt(0).toUpperCase() + fechaTexto.slice(1),
+    hora: horaTexto,
+    estado: ESTADO_TEXTO[t.estado] || t.estado,
+    fechaISO: t.fechaYhora,
+  };
+}
+
 const ESTADO_ENUM = { Pendiente: 'PENDIENTE', Confirmado: 'CONFIRMADO', Cancelado: 'CANCELADO', Finalizado: 'FINALIZADO' };
 
 function saludoSegunHora() {
@@ -66,6 +83,7 @@ function Dashboard({ usuario, onLogout }) {
   // Turnos reales del paciente logueado (sección 2.3 del documento)
   const esPaciente = usuario.rol === 'paciente';
   const esAdmin = usuario.rol === 'admin';
+  const esMedico = usuario.rol === 'medico';
 
   const [listaTurnos, setListaTurnos] = useState([]);
   const [cargandoTurnos, setCargandoTurnos] = useState(() => esPaciente);
@@ -163,6 +181,37 @@ function Dashboard({ usuario, onLogout }) {
     }
   };
 
+  // ==========================================
+  // Agenda del médico logueado
+  // ==========================================
+  const [agendaMedico, setAgendaMedico] = useState([]);
+  const [cargandoAgenda, setCargandoAgenda] = useState(() => esMedico);
+  const [errorAgenda, setErrorAgenda] = useState('');
+
+  useEffect(() => {
+    if (!esMedico) return;
+    api.agendaMedico()
+      .then(({ data }) => setAgendaMedico(data.map(formatearTurnoMedico)))
+      .catch((err) => setErrorAgenda(err.message))
+      .finally(() => setCargandoAgenda(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const turnosHoyMedico = agendaMedico.filter((t) => {
+    const hoy = new Date(ahora);
+    const fechaTurno = new Date(t.fechaISO);
+    return fechaTurno.toDateString() === hoy.toDateString() && t.estado !== 'Cancelado';
+  });
+
+  const actualizarEstadoAgenda = async (id, nuevoEstado) => {
+    try {
+      await api.actualizarEstadoTurno(id, ESTADO_ENUM[nuevoEstado]);
+      setAgendaMedico(prev => prev.map(t => t.id === id ? { ...t, estado: nuevoEstado } : t));
+    } catch (err) {
+      alert(`No se pudo actualizar el turno: ${err.message}`);
+    }
+  };
+
   // Cierra el menú mobile con la tecla Escape (sección 4.2 del documento)
   useEffect(() => {
     const cerrarConEscape = (e) => {
@@ -234,6 +283,17 @@ function Dashboard({ usuario, onLogout }) {
                   className={`px-3 py-1.5 rounded-lg transition ${vistaActual === 'admin' ? 'bg-[#2563EB]/10 text-[#2563EB] font-semibold' : 'hover:text-[#2563EB]'}`}
                 >
                   Administración
+                </button>
+              )}
+              {esMedico && (
+                <button
+                  onClick={() => setVistaActual('agenda-medico')}
+                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${vistaActual === 'agenda-medico' ? 'bg-[#2563EB]/10 text-[#2563EB] font-semibold' : 'hover:text-[#2563EB]'}`}
+                >
+                  Mi agenda
+                  {turnosHoyMedico.length > 0 && (
+                    <span className="bg-[#DC2626] text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">{turnosHoyMedico.length}</span>
+                  )}
                 </button>
               )}
             </nav>
@@ -388,6 +448,27 @@ function Dashboard({ usuario, onLogout }) {
                   <rect x="3" y="14" width="7" height="7" rx="1" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 Administración
+              </button>
+            )}
+
+            {esMedico && (
+              <button
+                onClick={() => irA('agenda-medico')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${
+                  vistaActual === 'agenda-medico'
+                    ? (altoContraste ? 'bg-black text-white' : 'bg-[#2563EB]/10 text-[#2563EB]')
+                    : (altoContraste ? 'hover:bg-slate-100' : 'hover:bg-slate-800/60')
+                }`}
+                style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
+              >
+                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="9" strokeLinecap="round" strokeLinejoin="round" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2" />
+                </svg>
+                Mi agenda
+                {turnosHoyMedico.length > 0 && (
+                  <span className="ml-auto bg-[#DC2626] text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">{turnosHoyMedico.length}</span>
+                )}
               </button>
             )}
 
@@ -633,6 +714,101 @@ function Dashboard({ usuario, onLogout }) {
             })}
           </div>
         </main>
+      ) : vistaActual === 'agenda-medico' ? (
+        // ==========================================
+        // VISTA: "Agenda del médico"
+        // ==========================================
+        <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+          <div>
+            <h1 className="font-bold" style={{ fontSize: modoAdultoMayor ? '32px' : '24px' }}>Mi agenda</h1>
+            <p className="text-slate-400 text-sm">{turnosHoyMedico.length} turno{turnosHoyMedico.length === 1 ? '' : 's'} hoy</p>
+          </div>
+
+          {cargandoAgenda && (
+            <div className="text-slate-400 text-sm py-4">Cargando tu agenda...</div>
+          )}
+
+          {errorAgenda && !cargandoAgenda && (
+            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+              No se pudo cargar tu agenda: {errorAgenda}
+            </div>
+          )}
+
+          {!cargandoAgenda && !errorAgenda && agendaMedico.length === 0 && (
+            <div className={`p-8 rounded-xl border text-center ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>
+              Todavía no tenés turnos asignados.
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {agendaMedico.map((turno) => {
+              const colorBarra =
+                turno.estado === 'Confirmado' ? 'border-l-emerald-500' :
+                turno.estado === 'Pendiente' ? 'border-l-amber-500' :
+                turno.estado === 'Finalizado' ? 'border-l-blue-500' : 'border-l-red-500';
+
+              const badgeColor =
+                turno.estado === 'Confirmado' ? 'bg-emerald-100 text-emerald-700' :
+                turno.estado === 'Pendiente' ? 'bg-amber-100 text-amber-700' :
+                turno.estado === 'Finalizado' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700';
+
+              const finalizado = turno.estado === 'Finalizado' || turno.estado === 'Cancelado';
+
+              return (
+                <div
+                  key={turno.id}
+                  className={`p-5 rounded-xl border-l-4 ${colorBarra} border shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+                    altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 text-[#F1F5F9]'
+                  }`}
+                >
+                  <div className="flex items-start space-x-4">
+                    <div className="w-12 h-12 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center shrink-0">
+                      {turno.paciente.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${badgeColor}`}>{turno.estado}</span>
+                      </div>
+                      <h3 className="font-bold text-lg">{turno.paciente}</h3>
+                      <p className={`text-sm mt-1 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>📅 {turno.fecha} — <strong>{turno.hora}</strong></p>
+                      <p className={`text-xs mt-0.5 ${altoContraste ? 'text-black' : 'text-slate-400'}`}>{turno.email} · {turno.telefono} · {turno.obraSocial}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
+                    <button
+                      onClick={() => actualizarEstadoAgenda(turno.id, 'Confirmado')}
+                      disabled={finalizado || turno.estado === 'Confirmado'}
+                      className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                        altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-emerald-500 text-emerald-400 hover:bg-emerald-600/10'
+                      }`}
+                    >
+                      Confirmar
+                    </button>
+                    <button
+                      onClick={() => actualizarEstadoAgenda(turno.id, 'Finalizado')}
+                      disabled={finalizado}
+                      className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                        altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-blue-500 text-blue-400 hover:bg-blue-600/10'
+                      }`}
+                    >
+                      Finalizar
+                    </button>
+                    <button
+                      onClick={() => actualizarEstadoAgenda(turno.id, 'Cancelado')}
+                      disabled={finalizado}
+                      className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                        altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-red-500 text-red-400 hover:bg-red-600/10'
+                      }`}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </main>
       ) : vistaActual === 'mis-turnos' ? (
         <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -831,9 +1007,28 @@ function Dashboard({ usuario, onLogout }) {
             </div>
           )}
 
-          {!esPaciente && (
+          {esAdmin && (
             <div className={`p-6 rounded-2xl border text-center ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>
-              {esAdmin ? 'Usá el menú "Administración" para gestionar turnos.' : 'La agenda de médico todavía no está conectada — próximamente.'}
+              Usá el menú "Administración" para gestionar turnos.
+            </div>
+          )}
+
+          {esMedico && (
+            <div className={`p-6 rounded-2xl shadow-xl relative overflow-hidden ${altoContraste ? 'bg-white border-2 border-black text-black' : 'bg-[#2563EB] text-white'}`}>
+              <p className={`uppercase tracking-wider font-semibold mb-1 ${altoContraste ? 'text-black' : 'text-blue-200'}`} style={{ fontSize: modoAdultoMayor ? '16px' : '12px' }}>Hoy</p>
+              <h2 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '30px' : '24px' }}>
+                {turnosHoyMedico.length} turno{turnosHoyMedico.length === 1 ? '' : 's'} agendado{turnosHoyMedico.length === 1 ? '' : 's'}
+              </h2>
+              <p className={`mb-4 ${altoContraste ? 'text-black' : 'text-blue-100'}`} style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>
+                Revisá y confirmá los turnos de tus pacientes.
+              </p>
+              <button
+                onClick={() => setVistaActual('agenda-medico')}
+                className={`font-semibold px-4 py-2 rounded-lg shadow transition ${altoContraste ? 'bg-black text-white hover:bg-slate-800' : 'bg-white text-[#2563EB] hover:bg-blue-50'}`}
+                style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}
+              >
+                Ver mi agenda &gt;
+              </button>
             </div>
           )}
         </main>

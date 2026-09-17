@@ -62,6 +62,7 @@ export const api = {
   todosLosTurnos: () => request('/turnos'),
   actualizarEstadoTurno: (idTurno, estado) =>
     request(`/turnos/${idTurno}`, { method: 'PATCH', body: { estado } }),
+  agendaMedico: () => request('/turnos/agenda-medico'),
   especialidades: () => request('/especialidades'),
   medicos: () => request('/medicos'),
   crearTurno: (medicoId, fechaYhora) =>
