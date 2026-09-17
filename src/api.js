@@ -101,6 +101,8 @@ export const api = {
     request('/turnos', { method: 'POST', body: { medicoId, fechaYhora } }),
   crearEspecialidad: (nombre) =>
     request('/especialidades', { method: 'POST', body: { nombre } }),
+  eliminarEspecialidad: (idEspecialidad) =>
+    request(`/especialidades/${idEspecialidad}`, { method: 'DELETE' }),
   crearMedico: (datos) =>
     request('/medicos', { method: 'POST', body: datos }),
 };

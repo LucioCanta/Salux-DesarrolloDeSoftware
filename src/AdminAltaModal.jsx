@@ -44,6 +44,22 @@ function FormEspecialidad() {
   const [error, setError] = useState('');
   const [exito, setExito] = useState('');
 
+  const [especialidades, setEspecialidades] = useState([]);
+  const [cargandoLista, setCargandoLista] = useState(true);
+  const [errorLista, setErrorLista] = useState('');
+  const [eliminandoId, setEliminandoId] = useState(null);
+
+  const cargarEspecialidades = () => {
+    api.especialidades()
+      .then(({ data }) => setEspecialidades(data))
+      .catch((err) => setErrorLista(err.message))
+      .finally(() => setCargandoLista(false));
+  };
+
+  useEffect(() => {
+    cargarEspecialidades();
+  }, []);
+
   const enviar = async (e) => {
     e.preventDefault();
     setError('');
@@ -53,6 +69,7 @@ function FormEspecialidad() {
       const { data } = await api.crearEspecialidad(nombre);
       setExito(`Especialidad "${data.nombre}" creada con éxito.`);
       setNombre('');
+      setEspecialidades((prev) => [...prev, data]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -60,18 +77,61 @@ function FormEspecialidad() {
     }
   };
 
+  const eliminar = async (esp) => {
+    if (!confirm(`¿Eliminar la especialidad "${esp.nombre}"?`)) return;
+    setError('');
+    setExito('');
+    setEliminandoId(esp.idEspecialidad);
+    try {
+      await api.eliminarEspecialidad(esp.idEspecialidad);
+      setEspecialidades((prev) => prev.filter((e) => e.idEspecialidad !== esp.idEspecialidad));
+      setExito(`Especialidad "${esp.nombre}" eliminada.`);
+    } catch (err) {
+      // Es esperable que esto falle con "hay médicos asignados" — se lo mostramos tal cual al admin
+      setError(err.message);
+    } finally {
+      setEliminandoId(null);
+    }
+  };
+
   return (
-    <form onSubmit={enviar} className="space-y-4">
-      {exito && <div className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exito}</div>}
-      {error && <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
+    <div className="space-y-5">
+      <form onSubmit={enviar} className="space-y-4">
+        {exito && <div className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exito}</div>}
+        {error && <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
+        <div>
+          <label className={labelClase}>Nombre de la especialidad <span className="text-red-500">*</span></label>
+          <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required placeholder="Ej: Cardiología" className={inputClase} />
+        </div>
+        <button type="submit" disabled={enviando} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition">
+          {enviando ? 'Creando...' : 'Crear especialidad'}
+        </button>
+      </form>
+
       <div>
-        <label className={labelClase}>Nombre de la especialidad <span className="text-red-500">*</span></label>
-        <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required placeholder="Ej: Cardiología" className={inputClase} />
+        <p className={labelClase}>Especialidades existentes</p>
+        {cargandoLista && <p className="text-slate-400 text-sm">Cargando...</p>}
+        {errorLista && !cargandoLista && <p className="text-red-400 text-sm">No se pudo cargar la lista: {errorLista}</p>}
+        {!cargandoLista && !errorLista && especialidades.length === 0 && (
+          <p className="text-slate-400 text-sm">Todavía no hay ninguna cargada.</p>
+        )}
+        <ul className="space-y-2 max-h-40 overflow-y-auto pr-1">
+          {especialidades.map((esp) => (
+            <li key={esp.idEspecialidad} className="flex items-center justify-between px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 text-sm">
+              <span>{esp.nombre}</span>
+              <button
+                type="button"
+                onClick={() => eliminar(esp)}
+                disabled={eliminandoId === esp.idEspecialidad}
+                className="text-red-400 hover:text-red-300 disabled:opacity-50 text-xs font-semibold"
+              >
+                {eliminandoId === esp.idEspecialidad ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
-      <button type="submit" disabled={enviando} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition">
-        {enviando ? 'Creando...' : 'Crear especialidad'}
-      </button>
-    </form>
+    </div>
   );
 }
 
