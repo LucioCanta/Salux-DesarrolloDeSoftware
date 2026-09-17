@@ -59,4 +59,7 @@ export const api = {
   misTurnos: () => request('/turnos/mis-turnos'),
   cancelarTurno: (idTurno) =>
     request(`/turnos/${idTurno}`, { method: 'PATCH', body: { estado: 'CANCELADO' } }),
+  todosLosTurnos: () => request('/turnos'),
+  actualizarEstadoTurno: (idTurno, estado) =>
+    request(`/turnos/${idTurno}`, { method: 'PATCH', body: { estado } }),
 };

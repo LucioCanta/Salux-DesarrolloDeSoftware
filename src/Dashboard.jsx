@@ -19,6 +19,23 @@ function formatearTurno(t) {
   };
 }
 
+function formatearTurnoAdmin(t) {
+  const fecha = new Date(t.fechaYhora);
+  const fechaTexto = fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const horaTexto = fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
+  return {
+    id: t.idTurno,
+    paciente: t.paciente?.usuario?.nomYape || 'Paciente',
+    especialidad: t.medico?.especialidades?.[0]?.nombre || 'Consulta general',
+    medico: t.medico?.usuario?.nomYape || 'Médico',
+    fecha: fechaTexto,
+    hora: horaTexto,
+    estado: ESTADO_TEXTO[t.estado] || t.estado,
+  };
+}
+
+const ESTADO_ENUM = { Pendiente: 'PENDIENTE', Confirmado: 'CONFIRMADO', Cancelado: 'CANCELADO', Finalizado: 'FINALIZADO' };
+
 function saludoSegunHora() {
   const hora = new Date().getHours();
   if (hora < 12) return 'Buenos días,';
@@ -89,20 +106,21 @@ function Dashboard({ usuario, onLogout }) {
 
   // ==========================================
   // Estado y datos del Panel de Administración (Sección 2.4)
-  // Todavía es mock: el backend no tiene un endpoint para listar turnos de todos los pacientes.
   // ==========================================
-  const [turnosAdmin, setTurnosAdmin] = useState([
-    { id: 1, paciente: 'María González', especialidad: 'Cardiología', medico: 'Dr. Martín García', fecha: '22/05/2026', hora: '10:30 hs', estado: 'Confirmado' },
-    { id: 2, paciente: 'Juan Pérez', especialidad: 'Pediatría', medico: 'Dra. Ana Rodríguez', fecha: '26/05/2026', hora: '14:00 hs', estado: 'Pendiente' },
-    { id: 3, paciente: 'Laura Fernández', especialidad: 'Traumatología', medico: 'Dr. Carlos López', fecha: '06/06/2026', hora: '09:15 hs', estado: 'Confirmado' },
-    { id: 4, paciente: 'Diego Martínez', especialidad: 'Pediatría', medico: 'Dra. Sofía Gómez', fecha: '10/04/2026', hora: '11:00 hs', estado: 'Cancelado' },
-    { id: 5, paciente: 'Camila Torres', especialidad: 'Dermatología', medico: 'Dra. Valeria Suárez', fecha: '02/06/2026', hora: '16:30 hs', estado: 'Pendiente' },
-    { id: 6, paciente: 'Roberto Sánchez', especialidad: 'Cardiología', medico: 'Dr. Martín García', fecha: '15/06/2026', hora: '08:45 hs', estado: 'Confirmado' },
-    { id: 7, paciente: 'Sofía Ramírez', especialidad: 'Neurología', medico: 'Dr. Emilio Castro', fecha: '18/06/2026', hora: '13:00 hs', estado: 'Pendiente' },
-    { id: 8, paciente: 'Martín Álvarez', especialidad: 'Traumatología', medico: 'Dr. Carlos López', fecha: '20/06/2026', hora: '10:00 hs', estado: 'Cancelado' },
-  ]);
+  const [turnosAdmin, setTurnosAdmin] = useState([]);
+  const [cargandoAdmin, setCargandoAdmin] = useState(() => esAdmin);
+  const [errorAdmin, setErrorAdmin] = useState('');
   const [busquedaAdmin, setBusquedaAdmin] = useState('');
   const [filtroEstadoAdmin, setFiltroEstadoAdmin] = useState('Todos');
+
+  useEffect(() => {
+    if (!esAdmin) return;
+    api.todosLosTurnos()
+      .then(({ data }) => setTurnosAdmin(data.map(formatearTurnoAdmin)))
+      .catch((err) => setErrorAdmin(err.message))
+      .finally(() => setCargandoAdmin(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const estadisticasAdmin = {
     total: turnosAdmin.length,
@@ -121,8 +139,13 @@ function Dashboard({ usuario, onLogout }) {
     return coincideEstado && coincideBusqueda;
   });
 
-  const actualizarEstadoTurnoAdmin = (id, nuevoEstado) => {
-    setTurnosAdmin(prev => prev.map(t => t.id === id ? { ...t, estado: nuevoEstado } : t));
+  const actualizarEstadoTurnoAdmin = async (id, nuevoEstado) => {
+    try {
+      await api.actualizarEstadoTurno(id, ESTADO_ENUM[nuevoEstado]);
+      setTurnosAdmin(prev => prev.map(t => t.id === id ? { ...t, estado: nuevoEstado } : t));
+    } catch (err) {
+      alert(`No se pudo actualizar el turno: ${err.message}`);
+    }
   };
 
   // Cierra el menú mobile con la tecla Escape (sección 4.2 del documento)
@@ -431,9 +454,11 @@ function Dashboard({ usuario, onLogout }) {
         // VISTA 3: "Panel de Administración" (2.4)
         // ==========================================
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-          <div className={`px-4 py-3 rounded-xl border text-sm ${altoContraste ? 'bg-white border-black text-black' : 'bg-amber-500/10 border-amber-500/30 text-amber-400'}`}>
-            ⚠️ Esta vista todavía muestra datos de ejemplo — falta conectar el endpoint de administración en el backend.
-          </div>
+          {errorAdmin && !cargandoAdmin && (
+            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+              No se pudieron cargar los turnos: {errorAdmin}
+            </div>
+          )}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <span className={`inline-block font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-2 ${
@@ -515,9 +540,13 @@ function Dashboard({ usuario, onLogout }) {
             Mostrando {turnosAdminFiltrados.length} de {turnosAdmin.length} turnos
           </p>
 
+          {cargandoAdmin && (
+            <div className="text-slate-400 text-sm py-4">Cargando turnos...</div>
+          )}
+
           {/* Listado de turnos de todos los pacientes */}
           <div className="space-y-4">
-            {turnosAdminFiltrados.length === 0 && (
+            {!cargandoAdmin && turnosAdminFiltrados.length === 0 && (
               <div className={`p-8 rounded-xl border text-center ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>
                 No se encontraron turnos con los filtros aplicados.
               </div>
