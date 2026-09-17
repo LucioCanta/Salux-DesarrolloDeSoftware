@@ -1,3 +1,5 @@
 # Salux-DesarrolloDeSoftware
 
-feature/login_LC Contiene todo el codigo front del login hecho por lucio 
+login Contiene todo el codigo front del login hecho por lucio 
+
+dashboard es la rama creada para trabajar el dashboard principal de Salux
