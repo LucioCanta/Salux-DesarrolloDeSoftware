@@ -113,7 +113,7 @@ function FormMedico() {
     setEnviando(true);
     try {
       const { data } = await api.crearMedico({ email, dni, contrasena, nomYape, matricula, consultorio, especialidadesIds });
-      setExito(`Médico "${data.medico.usuario.nomYape}" creado con éxito.`);
+      setExito(`Médico "${data.nomYape}" creado con éxito.`);
       setEmail(''); setDni(''); setContrasena(''); setNomYape(''); setMatricula(''); setConsultorio(''); setEspecialidadesIds([]);
     } catch (err) {
       setError(err.message);
