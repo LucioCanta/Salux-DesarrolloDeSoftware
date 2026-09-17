@@ -1,12 +1,38 @@
 import { useState, useEffect } from 'react';
 import { api } from './api';
 
-// Formato que espera <input type="datetime-local">, con mínimo "ahora + 1 hora"
-function minimoFechaHora() {
-  const d = new Date(Date.now() + 60 * 60 * 1000);
-  d.setSeconds(0, 0);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const DIAS_A_MOSTRAR = 14;
+const HORA_INICIO = 8;
+const HORA_FIN = 20;
+const MINUTOS_ANTICIPACION = 60;
+
+// Próximos N días a partir de hoy, para los "chips" de fecha — el año nunca
+// se le pide al usuario, se infiere solo de la fecha real del sistema.
+function generarProximosDias(cantidad) {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  return Array.from({ length: cantidad }, (_, i) => {
+    const dia = new Date(hoy);
+    dia.setDate(dia.getDate() + i);
+    return dia;
+  });
+}
+
+// Horarios de 30 en 30 minutos dentro del horario de atención, para un día
+// puntual — filtra los que ya pasaron (con un margen de 1 hora) si el día
+// elegido es hoy.
+function generarHorarios(dia) {
+  if (!dia) return [];
+  const minimo = Date.now() + MINUTOS_ANTICIPACION * 60 * 1000;
+  const horarios = [];
+  for (let h = HORA_INICIO; h < HORA_FIN; h++) {
+    for (const m of [0, 30]) {
+      const slot = new Date(dia);
+      slot.setHours(h, m, 0, 0);
+      if (slot.getTime() >= minimo) horarios.push(slot);
+    }
+  }
+  return horarios;
 }
 
 function NuevoTurnoModal({ onClose, onCreado }) {
@@ -18,10 +44,19 @@ function NuevoTurnoModal({ onClose, onCreado }) {
 
   const [especialidadId, setEspecialidadId] = useState(null);
   const [medicoId, setMedicoId] = useState(null);
-  const [fechaHora, setFechaHora] = useState('');
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(null);
+  const [horaSeleccionada, setHoraSeleccionada] = useState(null);
 
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState('');
+
+  const [proximosDias] = useState(() => generarProximosDias(DIAS_A_MOSTRAR));
+  const horariosDelDia = generarHorarios(fechaSeleccionada);
+
+  const elegirDia = (dia) => {
+    setFechaSeleccionada(dia);
+    setHoraSeleccionada(null);
+  };
 
   useEffect(() => {
     Promise.all([api.especialidades(), api.medicos()])
@@ -42,8 +77,7 @@ function NuevoTurnoModal({ onClose, onCreado }) {
     setEnviando(true);
     setErrorEnvio('');
     try {
-      const fechaISO = new Date(fechaHora).toISOString();
-      await api.crearTurno(medicoId, fechaISO);
+      await api.crearTurno(medicoId, horaSeleccionada.toISOString());
       onCreado();
     } catch (err) {
       setErrorEnvio(err.message);
@@ -120,13 +154,69 @@ function NuevoTurnoModal({ onClose, onCreado }) {
                 <p className="font-medium">{medicoElegido?.usuario?.nomYape}</p>
                 <p className="text-slate-400">{especialidades.find((e) => e.idEspecialidad === especialidadId)?.nombre}</p>
               </div>
-              <input
-                type="datetime-local"
-                value={fechaHora}
-                min={minimoFechaHora()}
-                onChange={(e) => setFechaHora(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200"
-              />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Elegí un día</p>
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  {proximosDias.map((dia) => {
+                    const seleccionado = fechaSeleccionada?.getTime() === dia.getTime();
+                    return (
+                      <button
+                        key={dia.getTime()}
+                        type="button"
+                        onClick={() => elegirDia(dia)}
+                        className={`shrink-0 flex flex-col items-center justify-center w-16 py-2 rounded-lg border text-xs font-medium transition ${
+                          seleccionado
+                            ? 'bg-blue-600 border-blue-500 text-white'
+                            : 'border-slate-700 bg-slate-800 hover:border-blue-500 text-slate-300'
+                        }`}
+                      >
+                        <span className="uppercase">{dia.toLocaleDateString('es-AR', { weekday: 'short' })}</span>
+                        <span className="text-lg font-bold leading-tight">{dia.getDate()}</span>
+                        <span className="capitalize">{dia.toLocaleDateString('es-AR', { month: 'short' })}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {fechaSeleccionada && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Elegí un horario</p>
+                  {horariosDelDia.length === 0 ? (
+                    <p className="text-slate-400 text-sm">No quedan horarios disponibles ese día. Probá con otra fecha.</p>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-2">
+                      {horariosDelDia.map((slot) => {
+                        const seleccionado = horaSeleccionada?.getTime() === slot.getTime();
+                        return (
+                          <button
+                            key={slot.getTime()}
+                            type="button"
+                            onClick={() => setHoraSeleccionada(slot)}
+                            className={`py-2 rounded-lg border text-sm font-medium transition ${
+                              seleccionado
+                                ? 'bg-blue-600 border-blue-500 text-white'
+                                : 'border-slate-700 bg-slate-800 hover:border-blue-500 text-slate-300'
+                            }`}
+                          >
+                            {slot.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {horaSeleccionada && (
+                <div className="px-4 py-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-300 text-sm">
+                  Turno el{' '}
+                  <strong className="capitalize">
+                    {horaSeleccionada.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </strong>{' '}
+                  a las <strong>{horaSeleccionada.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</strong>
+                </div>
+              )}
 
               {errorEnvio && (
                 <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
@@ -138,7 +228,7 @@ function NuevoTurnoModal({ onClose, onCreado }) {
                 <button onClick={() => setPaso(2)} className="text-sm text-blue-400 hover:underline">&larr; Cambiar médico</button>
                 <button
                   onClick={confirmar}
-                  disabled={!fechaHora || enviando}
+                  disabled={!horaSeleccionada || enviando}
                   className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg transition"
                 >
                   {enviando ? 'Reservando...' : 'Confirmar turno'}
