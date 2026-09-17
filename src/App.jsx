@@ -1,13 +1,67 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Dashboard from './Dashboard';
+import { api, getToken, getUsuarioGuardado, guardarSesion, borrarSesion } from './api';
 
 function App() {
-  const [estaLogueado, setEstaLogueado] = useState(false);
+  const [usuario, setUsuario] = useState(() => getUsuarioGuardado());
+  const [verificandoSesion, setVerificandoSesion] = useState(() => !!getToken() && !getUsuarioGuardado());
   const [modoAdultoMayor, setModoAdultoMayor] = useState(false);
   const [mostrarPassword, setMostrarPassword] = useState(false);
+  const [email, setEmail] = useState('');
+  const [contrasena, setContrasena] = useState('');
+  const [error, setError] = useState('');
+  const [enviando, setEnviando] = useState(false);
 
-  if (estaLogueado) {
-    return <Dashboard />;
+  // Al cargar la app, si ya había un token guardado, lo validamos contra el backend
+  // en vez de forzar un nuevo login cada vez que se refresca la página.
+  useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+
+    api.perfil()
+      .then(({ usuario: usuarioActual }) => {
+        setUsuario(usuarioActual);
+        guardarSesion(token, usuarioActual);
+      })
+      .catch(() => {
+        borrarSesion();
+        setUsuario(null);
+      })
+      .finally(() => setVerificandoSesion(false));
+  }, []);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    setEnviando(true);
+    try {
+      const { token, usuario: usuarioLogueado } = await api.login(email, contrasena);
+      guardarSesion(token, usuarioLogueado);
+      setUsuario(usuarioLogueado);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const handleLogout = () => {
+    borrarSesion();
+    setUsuario(null);
+    setEmail('');
+    setContrasena('');
+  };
+
+  if (verificandoSesion) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
+        Cargando...
+      </div>
+    );
+  }
+
+  if (usuario) {
+    return <Dashboard usuario={usuario} onLogout={handleLogout} />;
   }
 
   return (
@@ -32,14 +86,23 @@ function App() {
           <p className={`text-slate-400 mt-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>Sistema de Gestión de Turnos Médicos</p>
         </div>
 
+        {error && (
+          <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+
         {/* Formulario */}
-        <form className={`space-y-4 ${modoAdultoMayor ? 'space-y-6' : ''}`} onSubmit={(e) => { e.preventDefault(); setEstaLogueado(true); }}>
+        <form className={`space-y-4 ${modoAdultoMayor ? 'space-y-6' : ''}`} onSubmit={handleLogin}>
           <div>
             <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
               DNI o Email <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
               placeholder="Ej: 30456789 o nombre@email.com"
               className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
             />
@@ -52,6 +115,9 @@ function App() {
             <div className="relative">
               <input
                 type={mostrarPassword ? "text" : "password"}
+                value={contrasena}
+                onChange={(e) => setContrasena(e.target.value)}
+                required
                 placeholder="Ingresá tu contraseña"
                 className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 pr-10 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
               />
@@ -78,9 +144,10 @@ function App() {
 
           <button
             type="submit"
-            className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition shadow-md flex items-center justify-center ${modoAdultoMayor ? 'py-4 text-lg min-h-[60px]' : 'py-3 text-sm min-h-[52px]'}`}
+            disabled={enviando}
+            className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition shadow-md flex items-center justify-center disabled:opacity-60 ${modoAdultoMayor ? 'py-4 text-lg min-h-[60px]' : 'py-3 text-sm min-h-[52px]'}`}
           >
-            Iniciar sesión
+            {enviando ? 'Ingresando...' : 'Iniciar sesión'}
           </button>
 
           <button
