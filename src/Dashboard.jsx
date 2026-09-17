@@ -13,7 +13,7 @@ function formatearTurno(t) {
     id: t.idTurno,
     especialidad: t.medico?.especialidades?.[0]?.nombre || 'Consulta general',
     medico: t.medico?.usuario?.nomYape || 'Médico',
-    consultorio: t.medico?.consultorio || 'A confirmar',
+    consultorio: t.medico?.consultorio ? `Consultorio ${t.medico.consultorio}` : 'Consultorio a confirmar',
     fecha: fechaTexto.charAt(0).toUpperCase() + fechaTexto.slice(1),
     hora: horaTexto,
     estado: ESTADO_TEXTO[t.estado] || t.estado,

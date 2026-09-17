@@ -142,7 +142,8 @@ function FormMedico() {
   const [email, setEmail] = useState('');
   const [dni, setDni] = useState('');
   const [contrasena, setContrasena] = useState('');
-  const [nomYape, setNomYape] = useState('');
+  const [nombre, setNombre] = useState('');
+  const [apellido, setApellido] = useState('');
   const [matricula, setMatricula] = useState('');
   const [consultorio, setConsultorio] = useState('');
   const [especialidadesIds, setEspecialidadesIds] = useState([]);
@@ -172,9 +173,10 @@ function FormMedico() {
     }
     setEnviando(true);
     try {
+      const nomYape = `${nombre.trim()} ${apellido.trim()}`.trim();
       const { data } = await api.crearMedico({ email, dni, contrasena, nomYape, matricula, consultorio, especialidadesIds });
       setExito(`Médico "${data.nomYape}" creado con éxito.`);
-      setEmail(''); setDni(''); setContrasena(''); setNomYape(''); setMatricula(''); setConsultorio(''); setEspecialidadesIds([]);
+      setEmail(''); setDni(''); setContrasena(''); setNombre(''); setApellido(''); setMatricula(''); setConsultorio(''); setEspecialidadesIds([]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -189,9 +191,15 @@ function FormMedico() {
       {exito && <div className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exito}</div>}
       {error && <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
 
-      <div>
-        <label className={labelClase}>Nombre completo <span className="text-red-500">*</span></label>
-        <input type="text" value={nomYape} onChange={(e) => setNomYape(e.target.value)} required placeholder="Ej: Dra. Ana Rodríguez" className={inputClase} />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelClase}>Nombre <span className="text-red-500">*</span></label>
+          <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required placeholder="Ana" className={inputClase} />
+        </div>
+        <div>
+          <label className={labelClase}>Apellido <span className="text-red-500">*</span></label>
+          <input type="text" value={apellido} onChange={(e) => setApellido(e.target.value)} required placeholder="Rodríguez" className={inputClase} />
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -214,7 +222,18 @@ function FormMedico() {
         </div>
         <div>
           <label className={labelClase}>Consultorio</label>
-          <input type="text" value={consultorio} onChange={(e) => setConsultorio(e.target.value)} placeholder="Consultorio 204" className={inputClase} />
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm pointer-events-none">Cons.</span>
+            <input
+              type="text"
+              value={consultorio}
+              onChange={(e) => setConsultorio(e.target.value)}
+              placeholder="204"
+              maxLength={10}
+              className={`${inputClase} pl-14`}
+            />
+          </div>
+          <p className="text-slate-500 text-xs mt-1">Solo el número/letra, ej: "A" o "204" — no escribas la palabra "Consultorio"</p>
         </div>
       </div>
 

@@ -9,7 +9,15 @@ const crearMedicoSchema = z.object({
   contrasena: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   nomYape: z.string().trim().min(1, 'El nombre es obligatorio'),
   matricula: z.string().trim().min(1, 'La matrícula es obligatoria'),
-  consultorio: z.string().trim().optional(),
+  // Valor corto (ej: "A", "12", "204"): la palabra "Consultorio" la agrega
+  // siempre la UI al mostrarlo, nunca se guarda como parte del dato.
+  consultorio: z.preprocess(
+    (valor) => (valor === '' || valor == null ? undefined : valor),
+    z.string()
+      .trim()
+      .regex(/^[A-Za-z0-9]{1,10}$/, 'El consultorio debe ser un valor corto, ej: "A" o "204" (sin la palabra "Consultorio")')
+      .optional()
+  ),
   especialidadesIds: z
     .array(z.number().int().positive())
     .min(1, 'Debe indicar al menos una especialidad'),

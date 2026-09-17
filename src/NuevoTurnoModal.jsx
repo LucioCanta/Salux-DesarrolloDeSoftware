@@ -104,7 +104,7 @@ function NuevoTurnoModal({ onClose, onCreado }) {
                       className="w-full px-4 py-3 rounded-lg border border-slate-700 bg-slate-800 hover:border-blue-500 text-left transition"
                     >
                       <p className="font-medium">{m.usuario?.nomYape}</p>
-                      <p className="text-xs text-slate-400">{m.consultorio || 'Consultorio a confirmar'}</p>
+                      <p className="text-xs text-slate-400">{m.consultorio ? `Consultorio ${m.consultorio}` : 'Consultorio a confirmar'}</p>
                     </button>
                   ))}
                 </div>
