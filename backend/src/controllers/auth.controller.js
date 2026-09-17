@@ -51,9 +51,10 @@ const login = async (req, res) => {
   try {
     const { email, contrasena } = req.body;
 
-    // 1. Buscamos si el usuario existe
+    // 1. Buscamos si el usuario existe, junto con sus perfiles para saber el rol
     const usuario = await prisma.usuario.findUnique({
-      where: { email }
+      where: { email },
+      include: { paciente: true, medico: true, admin: true }
     });
 
     if (!usuario) {
@@ -71,20 +72,24 @@ const login = async (req, res) => {
       return res.status(403).json({ ok: false, message: 'Tu cuenta está desactivada. Contactá a un administrador.' });
     }
 
+    const rol = usuario.admin ? 'admin' : usuario.medico ? 'medico' : 'paciente';
+
     // 3. Generamos el Token JWT (usando la clave secreta de tu .env)
     const token = jwt.sign(
-      { 
-        id: usuario.idUsuario, 
-        email: usuario.email
+      {
+        id: usuario.idUsuario,
+        email: usuario.email,
+        rol
       },
       process.env.JWT_SECRET,
       { expiresIn: '2h' } // El token durará 2 horas
     );
 
-    res.json({ 
-      ok: true, 
+    res.json({
+      ok: true,
       message: 'Inicio de sesión exitoso',
-      token 
+      token,
+      usuario: { id: usuario.idUsuario, email: usuario.email, nombre: usuario.nomYape, rol }
     });
 
   } catch (error) {
@@ -95,12 +100,23 @@ const login = async (req, res) => {
 const obtenerPerfil = async (req, res) => {
   try {
     // Si llegamos hasta acá, es porque el middleware (verificarToken) nos dejó pasar
+    const usuario = await prisma.usuario.findUnique({
+      where: { idUsuario: req.usuario.id },
+      include: { paciente: true, medico: true, admin: true }
+    });
+
+    if (!usuario || !usuario.activo) {
+      return res.status(401).json({ ok: false, message: 'Usuario no válido' });
+    }
+
+    const rol = usuario.admin ? 'admin' : usuario.medico ? 'medico' : 'paciente';
+
     res.json({
       ok: true,
-      message: '¡Pasaste la seguridad! Este es un endpoint privado.',
-      datosDelToken: req.usuario
+      usuario: { id: usuario.idUsuario, email: usuario.email, nombre: usuario.nomYape, rol }
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };

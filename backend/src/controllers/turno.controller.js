@@ -34,7 +34,8 @@ const crearTurno = async (req, res) => {
           include: {
             usuario: {
               select: { nomYape: true }
-            }
+            },
+            especialidades: true
           }
         }
       }
@@ -76,7 +77,8 @@ const obtenerMisTurnos = async (req, res) => {
           include: {
             usuario: {
               select: { nomYape: true }
-            }
+            },
+            especialidades: true
           }
         }
       }
