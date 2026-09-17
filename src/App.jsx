@@ -7,8 +7,11 @@ function App() {
   const [verificandoSesion, setVerificandoSesion] = useState(() => !!getToken() && !getUsuarioGuardado());
   const [modoAdultoMayor, setModoAdultoMayor] = useState(false);
   const [mostrarPassword, setMostrarPassword] = useState(false);
+  const [modo, setModo] = useState('login'); // 'login' | 'registro'
   const [email, setEmail] = useState('');
   const [contrasena, setContrasena] = useState('');
+  const [nomYape, setNomYape] = useState('');
+  const [dni, setDni] = useState('');
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
 
@@ -45,11 +48,35 @@ function App() {
     }
   };
 
+  const handleRegistro = async (e) => {
+    e.preventDefault();
+    setError('');
+    setEnviando(true);
+    try {
+      await api.register({ email, dni, contrasena, nomYape });
+      const { token, usuario: usuarioLogueado } = await api.login(email, contrasena);
+      guardarSesion(token, usuarioLogueado);
+      setUsuario(usuarioLogueado);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const cambiarModo = (nuevoModo) => {
+    setModo(nuevoModo);
+    setError('');
+  };
+
   const handleLogout = () => {
     borrarSesion();
     setUsuario(null);
     setEmail('');
     setContrasena('');
+    setNomYape('');
+    setDni('');
+    setModo('login');
   };
 
   if (verificandoSesion) {
@@ -93,17 +120,48 @@ function App() {
         )}
 
         {/* Formulario */}
-        <form className={`space-y-4 ${modoAdultoMayor ? 'space-y-6' : ''}`} onSubmit={handleLogin}>
+        <form className={`space-y-4 ${modoAdultoMayor ? 'space-y-6' : ''}`} onSubmit={modo === 'login' ? handleLogin : handleRegistro}>
+          {modo === 'registro' && (
+            <>
+              <div>
+                <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
+                  Nombre completo <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={nomYape}
+                  onChange={(e) => setNomYape(e.target.value)}
+                  required
+                  placeholder="Ej: Juan Pérez"
+                  className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
+                />
+              </div>
+              <div>
+                <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
+                  DNI <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={dni}
+                  onChange={(e) => setDni(e.target.value)}
+                  required
+                  placeholder="Ej: 30456789"
+                  className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
+                />
+              </div>
+            </>
+          )}
+
           <div>
             <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
-              DNI o Email <span className="text-red-500">*</span>
+              {modo === 'login' ? 'DNI o Email' : 'Email'} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="Ej: 30456789 o nombre@email.com"
+              placeholder={modo === 'login' ? 'Ej: 30456789 o nombre@email.com' : 'Ej: nombre@email.com'}
               className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
             />
           </div>
@@ -118,7 +176,8 @@ function App() {
                 value={contrasena}
                 onChange={(e) => setContrasena(e.target.value)}
                 required
-                placeholder="Ingresá tu contraseña"
+                minLength={modo === 'registro' ? 8 : undefined}
+                placeholder={modo === 'login' ? 'Ingresá tu contraseña' : 'Mínimo 8 caracteres'}
                 className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 pr-10 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
               />
               {/* Botón del ícono de visibilidad (ojo) */}
@@ -138,23 +197,26 @@ function App() {
             </div>
           </div>
 
-          <div className="flex items-center justify-end">
-            <a href="#" className={`text-blue-500 hover:underline ${modoAdultoMayor ? 'text-base' : 'text-xs'}`}>¿Olvidaste tu contraseña?</a>
-          </div>
+          {modo === 'login' && (
+            <div className="flex items-center justify-end">
+              <a href="#" className={`text-blue-500 hover:underline ${modoAdultoMayor ? 'text-base' : 'text-xs'}`}>¿Olvidaste tu contraseña?</a>
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={enviando}
             className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition shadow-md flex items-center justify-center disabled:opacity-60 ${modoAdultoMayor ? 'py-4 text-lg min-h-[60px]' : 'py-3 text-sm min-h-[52px]'}`}
           >
-            {enviando ? 'Ingresando...' : 'Iniciar sesión'}
+            {enviando ? (modo === 'login' ? 'Ingresando...' : 'Creando cuenta...') : (modo === 'login' ? 'Iniciar sesión' : 'Crear cuenta')}
           </button>
 
           <button
             type="button"
+            onClick={() => cambiarModo(modo === 'login' ? 'registro' : 'login')}
             className={`w-full bg-transparent hover:bg-slate-800 text-slate-300 border border-slate-700 font-medium rounded-lg transition flex items-center justify-center ${modoAdultoMayor ? 'py-4 text-lg min-h-[60px]' : 'py-3 text-sm min-h-[52px]'}`}
           >
-            Crear una cuenta
+            {modo === 'login' ? 'Crear una cuenta' : 'Ya tengo una cuenta'}
           </button>
         </form>
 

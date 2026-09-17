@@ -205,10 +205,41 @@ const obtenerTurnosMedico = async (req, res) => {
   }
 };
 
+// 5. Obtener todos los turnos de todos los pacientes (solo Administradores)
+const obtenerTodosLosTurnos = async (req, res) => {
+  try {
+    const turnos = await prisma.turno.findMany({
+      orderBy: { fechaYhora: 'asc' },
+      include: {
+        paciente: {
+          select: {
+            usuario: { select: { nomYape: true, email: true } }
+          }
+        },
+        medico: {
+          include: {
+            usuario: { select: { nomYape: true } },
+            especialidades: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      ok: true,
+      data: turnos
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+};
+
 // Exportamos todas las funciones juntas
 module.exports = {
   crearTurno,
   obtenerMisTurnos,
   actualizarEstadoTurno,
-  obtenerTurnosMedico // <-- ¡No te olvides de agregarla acá!
+  obtenerTurnosMedico, // <-- ¡No te olvides de agregarla acá!
+  obtenerTodosLosTurnos
 };
