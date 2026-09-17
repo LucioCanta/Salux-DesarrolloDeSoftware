@@ -1,11 +1,13 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-const TOKEN_KEY = 'salux_token';
 const USUARIO_KEY = 'salux_usuario';
 
-export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
+// El Access Token vive SOLO en memoria (nunca en localStorage): así lo pide
+// la Entrega 3, para que no quede expuesto a un XSS que lea localStorage.
+// Como consecuencia, se pierde al recargar la página — por eso existe
+// refrescarSesion(), que lo repone usando el Refresh Token de la cookie
+// httpOnly (esa sí sobrevive un F5).
+let accessToken = null;
 
 export function getUsuarioGuardado() {
   const raw = localStorage.getItem(USUARIO_KEY);
@@ -21,27 +23,22 @@ export function getUsuarioGuardado() {
 }
 
 export function guardarSesion(token, usuario) {
-  localStorage.setItem(TOKEN_KEY, token);
+  accessToken = token;
   localStorage.setItem(USUARIO_KEY, JSON.stringify(usuario));
 }
 
 export function borrarSesion() {
-  localStorage.removeItem(TOKEN_KEY);
+  accessToken = null;
   localStorage.removeItem(USUARIO_KEY);
 }
 
-async function request(path, { method = 'GET', body, auth = true } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (auth) {
-    const token = getToken();
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-  }
-
+async function fetchJson(path, { method = 'GET', body, credentialsInclude = false, headers = {} } = {}) {
   let res;
   try {
     res = await fetch(`${API_URL}${path}`, {
       method,
       headers,
+      credentials: credentialsInclude ? 'include' : 'same-origin',
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
@@ -55,22 +52,53 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
     data = null;
   }
 
+  return { res, data };
+}
+
+function armarError(data) {
+  // Los errores de validación de Zod vienen en un array `errores`
+  // ({campo, mensaje}) además del mensaje genérico "Datos inválidos".
+  const detalleCampos = Array.isArray(data?.errores)
+    ? data.errores.map((e) => `${e.campo}: ${e.mensaje}`).join(' — ')
+    : null;
+  return new Error(detalleCampos || data?.message || data?.error || 'Error de conexión con el servidor');
+}
+
+// Pide un Access Token nuevo usando el Refresh Token de la cookie httpOnly
+// (credentials:'include' es lo que hace que el navegador mande esa cookie).
+async function refrescarSesion() {
+  const { res, data } = await fetchJson('/auth/refresh', { method: 'POST', credentialsInclude: true });
   if (!res.ok) {
-    // Una petición autenticada que vuelve 401 significa que el token venció
-    // o dejó de ser válido: cerramos la sesión local para no dejar al
-    // usuario "logueado" en una app que ya no puede hacer nada.
-    if (res.status === 401 && auth) {
+    accessToken = null;
+    throw armarError(data);
+  }
+  accessToken = data.token;
+  return data;
+}
+
+async function request(path, { method = 'GET', body, auth = true, _reintentado = false } = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (auth && accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+  const { res, data } = await fetchJson(path, { method, body, headers, credentialsInclude: true });
+
+  if (res.status === 401 && auth && !_reintentado) {
+    // El Access Token venció (dura 15 min) o es inválido: intentamos
+    // renovarlo UNA vez con el refresh token y reintentamos la petición
+    // original, todo transparente para quien llamó a esto.
+    try {
+      await refrescarSesion();
+      return request(path, { method, body, auth, _reintentado: true });
+    } catch {
       borrarSesion();
       window.location.reload();
+      // La recarga corta la ejecución; esto nunca debería resolverse.
+      return new Promise(() => {});
     }
+  }
 
-    // Los errores de validación de Zod vienen en un array `errores`
-    // ({campo, mensaje}) además del mensaje genérico "Datos inválidos".
-    const detalleCampos = Array.isArray(data?.errores)
-      ? data.errores.map((e) => `${e.campo}: ${e.mensaje}`).join(' — ')
-      : null;
-    const mensaje = detalleCampos || data?.message || data?.error || 'Error de conexión con el servidor';
-    throw new Error(mensaje);
+  if (!res.ok) {
+    throw armarError(data);
   }
 
   return data;
@@ -87,6 +115,8 @@ export const api = {
     request('/auth/login', { method: 'POST', body: { email, contrasena }, auth: false }),
   register: (datos) =>
     request('/auth/register', { method: 'POST', body: datos, auth: false }),
+  refrescarSesion,
+  logout: () => request('/auth/logout', { method: 'POST', auth: false }),
   perfil: () => request('/auth/perfil'),
   misTurnos: () => request('/turnos/mis-turnos'),
   cancelarTurno: (idTurno) =>

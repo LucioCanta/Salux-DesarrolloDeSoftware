@@ -3,6 +3,7 @@ require('dotenv').config({ override: true });
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 
 const prisma = require('./config/prisma');
@@ -24,10 +25,14 @@ app.set('trust proxy', 1);
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : '*',
+    // Con credentials:true el navegador NO permite origin:"*" — hace falta
+    // una lista explícita, porque el refresh token viaja en una cookie.
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : 'http://localhost:5173',
+    credentials: true,
   })
 );
 app.use(express.json({ limit: '10kb' }));
+app.use(cookieParser());
 
 // Límite general para toda la API
 app.use(
@@ -46,7 +51,7 @@ app.use(
 const crearLimiterAuth = () =>
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 20,
+    max: 10,
     standardHeaders: true,
     legacyHeaders: false,
     message: { ok: false, message: 'Demasiados intentos. Probá de nuevo más tarde.' },

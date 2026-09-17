@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
 import Dashboard from './Dashboard';
-import { api, getToken, getUsuarioGuardado, guardarSesion, borrarSesion } from './api';
+import { api, getUsuarioGuardado, guardarSesion, borrarSesion } from './api';
 
 function App() {
   const [usuario, setUsuario] = useState(() => getUsuarioGuardado());
-  const [verificandoSesion, setVerificandoSesion] = useState(() => !!getToken() && !getUsuarioGuardado());
+  // El Access Token vive en memoria (no en localStorage), así que se pierde
+  // al recargar la página. Si ya teníamos un usuario cacheado lo mostramos
+  // optimistamente mientras renovamos la sesión de verdad en el fondo con
+  // el refresh token (cookie httpOnly); si no hay nada cacheado, esperamos
+  // el resultado antes de mostrar cualquier pantalla.
+  const [verificandoSesion, setVerificandoSesion] = useState(() => !getUsuarioGuardado());
   const [modoAdultoMayor, setModoAdultoMayor] = useState(false);
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [modo, setModo] = useState('login'); // 'login' | 'registro'
@@ -15,16 +20,14 @@ function App() {
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
 
-  // Al cargar la app, si ya había un token guardado, lo validamos contra el backend
-  // en vez de forzar un nuevo login cada vez que se refresca la página.
+  // Al cargar la app pedimos un Access Token nuevo con el refresh token de
+  // la cookie httpOnly — es la única forma de recuperar sesión, ya que el
+  // Access Token en sí no sobrevive un refresh de página.
   useEffect(() => {
-    const token = getToken();
-    if (!token) return;
-
-    api.perfil()
-      .then(({ usuario: usuarioActual }) => {
-        setUsuario(usuarioActual);
+    api.refrescarSesion()
+      .then(({ token, usuario: usuarioActual }) => {
         guardarSesion(token, usuarioActual);
+        setUsuario(usuarioActual);
       })
       .catch(() => {
         borrarSesion();
@@ -69,7 +72,13 @@ function App() {
     setError('');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch {
+      // Si el logout en el servidor falla igual limpiamos todo localmente:
+      // el objetivo es que el usuario quede deslogueado sí o sí de su lado.
+    }
     borrarSesion();
     setUsuario(null);
     setEmail('');

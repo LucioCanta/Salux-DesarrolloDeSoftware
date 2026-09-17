@@ -6,6 +6,46 @@ const prisma = require('../config/prisma');
 // bcrypt.compare tarde lo mismo en ambos casos (ver login más abajo).
 const HASH_SENUELO = bcrypt.hashSync('salux-timing-guard', 12);
 
+const ACCESS_TOKEN_TTL = '15m';
+const REFRESH_TOKEN_TTL = '7d';
+const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const REFRESH_COOKIE_NAME = 'refreshToken';
+
+function derivarRol(usuario) {
+  return usuario.admin ? 'admin' : usuario.medico ? 'medico' : 'paciente';
+}
+
+// Arma el Access Token (corta duración, va en el body de la respuesta) y el
+// Refresh Token (larga duración, va SOLO en una cookie httpOnly) para un
+// usuario ya autenticado.
+function generarTokens(usuario, rol) {
+  const accessToken = jwt.sign(
+    { id: usuario.idUsuario, email: usuario.email, rol },
+    process.env.JWT_SECRET,
+    { expiresIn: ACCESS_TOKEN_TTL }
+  );
+
+  const refreshToken = jwt.sign(
+    { id: usuario.idUsuario },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: REFRESH_TOKEN_TTL }
+  );
+
+  return { accessToken, refreshToken };
+}
+
+// El Refresh Token viaja en una cookie httpOnly (inaccesible desde JS, evita
+// robo por XSS) y con scope acotado a /api/auth (solo la necesitan refresh/logout).
+function setRefreshCookie(res, refreshToken) {
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/auth',
+    maxAge: REFRESH_TOKEN_TTL_MS,
+  });
+}
+
 const register = async (req, res) => {
   try {
     // 1. Recibimos los datos del cliente (React)
@@ -40,8 +80,8 @@ const register = async (req, res) => {
       }
     });
 
-    res.status(201).json({ 
-      ok: true, 
+    res.status(201).json({
+      ok: true,
       message: 'Usuario registrado exitosamente como paciente',
       data: { id: nuevoUsuario.idUsuario, email: nuevoUsuario.email }
     });
@@ -78,23 +118,14 @@ const login = async (req, res) => {
       return res.status(403).json({ ok: false, message: 'Tu cuenta está desactivada. Contactá a un administrador.' });
     }
 
-    const rol = usuario.admin ? 'admin' : usuario.medico ? 'medico' : 'paciente';
-
-    // 3. Generamos el Token JWT (usando la clave secreta de tu .env)
-    const token = jwt.sign(
-      {
-        id: usuario.idUsuario,
-        email: usuario.email,
-        rol
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '2h' } // El token durará 2 horas
-    );
+    const rol = derivarRol(usuario);
+    const { accessToken, refreshToken } = generarTokens(usuario, rol);
+    setRefreshCookie(res, refreshToken);
 
     res.json({
       ok: true,
       message: 'Inicio de sesión exitoso',
-      token,
+      token: accessToken,
       usuario: { id: usuario.idUsuario, email: usuario.email, nombre: usuario.nomYape, rol }
     });
 
@@ -103,6 +134,61 @@ const login = async (req, res) => {
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
+
+// Renueva el Access Token usando el Refresh Token de la cookie httpOnly.
+// El frontend guarda el Access Token solo en memoria (nunca en localStorage),
+// así que necesita poder pedir uno nuevo cada vez que recarga la página o
+// cuando el actual vence (15 min).
+const refresh = async (req, res) => {
+  try {
+    const token = req.cookies?.[REFRESH_COOKIE_NAME];
+    if (!token) {
+      return res.status(401).json({ ok: false, message: 'No hay una sesión para renovar' });
+    }
+
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    } catch {
+      res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/auth' });
+      return res.status(401).json({ ok: false, message: 'La sesión venció, iniciá sesión de nuevo' });
+    }
+
+    const usuario = await prisma.usuario.findUnique({
+      where: { idUsuario: payload.id },
+      include: { paciente: true, medico: true, admin: true }
+    });
+
+    if (!usuario || !usuario.activo) {
+      res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/auth' });
+      return res.status(401).json({ ok: false, message: 'Sesión inválida' });
+    }
+
+    const rol = derivarRol(usuario);
+    // Rotamos también el refresh token en cada renovación (mejor práctica:
+    // limita la ventana útil de un refresh token robado).
+    const { accessToken, refreshToken } = generarTokens(usuario, rol);
+    setRefreshCookie(res, refreshToken);
+
+    res.json({
+      ok: true,
+      token: accessToken,
+      usuario: { id: usuario.idUsuario, email: usuario.email, nombre: usuario.nomYape, rol }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+};
+
+// Invalida la cookie del Refresh Token. El Access Token en memoria lo
+// descarta el propio cliente (no hay nada que hacer server-side con él,
+// ya que expira solo a los 15 min).
+const logout = (req, res) => {
+  res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/auth' });
+  res.json({ ok: true, message: 'Sesión cerrada' });
+};
+
 const obtenerPerfil = async (req, res) => {
   try {
     // Si llegamos hasta acá, es porque el middleware (verificarToken) nos dejó pasar
@@ -115,7 +201,7 @@ const obtenerPerfil = async (req, res) => {
       return res.status(401).json({ ok: false, message: 'Usuario no válido' });
     }
 
-    const rol = usuario.admin ? 'admin' : usuario.medico ? 'medico' : 'paciente';
+    const rol = derivarRol(usuario);
 
     res.json({
       ok: true,
@@ -127,9 +213,10 @@ const obtenerPerfil = async (req, res) => {
   }
 };
 
-// Acordate de agregarlo a la exportación final
 module.exports = {
   register,
   login,
+  refresh,
+  logout,
   obtenerPerfil
 };
