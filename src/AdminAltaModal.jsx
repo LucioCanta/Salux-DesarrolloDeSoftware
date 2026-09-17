@@ -145,7 +145,7 @@ function FormMedico() {
       </div>
       <div>
         <label className={labelClase}>Contraseña inicial <span className="text-red-500">*</span></label>
-        <input type="text" value={contrasena} onChange={(e) => setContrasena(e.target.value)} required minLength={8} placeholder="Mínimo 8 caracteres" className={inputClase} />
+        <input type="password" value={contrasena} onChange={(e) => setContrasena(e.target.value)} required minLength={8} placeholder="Mínimo 8 caracteres" className={inputClase} />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>

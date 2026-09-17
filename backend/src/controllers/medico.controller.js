@@ -6,13 +6,17 @@ const crearMedico = async (req, res) => {
     // 1. Recibimos los datos del usuario + los datos del médico (ya validados por Zod)
     const { email, dni, contrasena, nomYape, matricula, consultorio, especialidadesIds } = req.body;
 
-    // 2. Verificamos si el email o dni ya existen en el sistema
-    const usuarioExistente = await prisma.usuario.findFirst({
-      where: { OR: [{ email }, { dni }] }
-    });
+    // 2. Verificamos si el email, dni o matrícula ya existen en el sistema
+    const [usuarioExistente, matriculaExistente] = await Promise.all([
+      prisma.usuario.findFirst({ where: { OR: [{ email }, { dni }] } }),
+      prisma.medico.findUnique({ where: { matricula } }),
+    ]);
 
     if (usuarioExistente) {
       return res.status(400).json({ ok: false, message: 'El email o DNI ya están registrados' });
+    }
+    if (matriculaExistente) {
+      return res.status(400).json({ ok: false, message: 'Esa matrícula ya está registrada' });
     }
 
     // 4. Encriptamos la contraseña
@@ -36,10 +40,16 @@ const crearMedico = async (req, res) => {
           }
         }
       },
-      // Le pedimos a Prisma que nos devuelva los datos armados para verlos en la respuesta
-      include: {
+      // select explícito: NUNCA devolver la contraseña hasheada en la respuesta
+      select: {
+        idUsuario: true,
+        email: true,
+        nomYape: true,
         medico: {
-          include: {
+          select: {
+            idMedico: true,
+            matricula: true,
+            consultorio: true,
             especialidades: true
           }
         }
@@ -57,12 +67,17 @@ const crearMedico = async (req, res) => {
     if (error.code === 'P2025') {
       return res.status(400).json({ ok: false, message: 'Una o más especialidades no existen' });
     }
+    // Carrera entre dos altas simultáneas con el mismo email/dni/matrícula
+    if (error.code === 'P2002') {
+      return res.status(400).json({ ok: false, message: 'El email, DNI o matrícula ya están registrados' });
+    }
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
 const obtenerMedicos = async (req, res) => {
   try {
     const medicos = await prisma.medico.findMany({
+      where: { usuario: { activo: true } },
       include: {
         // Traemos los datos del usuario, pero seleccionamos qué campos mostrar por seguridad
         usuario: {

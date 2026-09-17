@@ -9,7 +9,15 @@ export function getToken() {
 
 export function getUsuarioGuardado() {
   const raw = localStorage.getItem(USUARIO_KEY);
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // localStorage corrupto/de un esquema viejo: lo descartamos en vez de
+    // romper el primer render de toda la app.
+    localStorage.removeItem(USUARIO_KEY);
+    return null;
+  }
 }
 
 export function guardarSesion(token, usuario) {
@@ -29,11 +37,16 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new Error('No se pudo conectar con el servidor. Revisá tu conexión.');
+  }
 
   let data;
   try {
@@ -43,13 +56,32 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
   }
 
   if (!res.ok) {
-    const mensaje = data?.message || data?.error || 'Error de conexión con el servidor';
+    // Una petición autenticada que vuelve 401 significa que el token venció
+    // o dejó de ser válido: cerramos la sesión local para no dejar al
+    // usuario "logueado" en una app que ya no puede hacer nada.
+    if (res.status === 401 && auth) {
+      borrarSesion();
+      window.location.reload();
+    }
+
+    // Los errores de validación de Zod vienen en un array `errores`
+    // ({campo, mensaje}) además del mensaje genérico "Datos inválidos".
+    const detalleCampos = Array.isArray(data?.errores)
+      ? data.errores.map((e) => `${e.campo}: ${e.mensaje}`).join(' — ')
+      : null;
+    const mensaje = detalleCampos || data?.message || data?.error || 'Error de conexión con el servidor';
     throw new Error(mensaje);
   }
 
   return data;
 }
 
+// OJO al leer el nombre de una persona en la respuesta: login/perfil lo
+// devuelven como `usuario.nombre`, pero cualquier objeto turno (misTurnos,
+// agendaMedico, todosLosTurnos) trae el nombre del médico/paciente como
+// `usuario.nomYape` (el nombre real de la columna en la base). Son dos
+// convenciones distintas para el mismo concepto — no asumas cuál es sin
+// mirar el controller correspondiente.
 export const api = {
   login: (email, contrasena) =>
     request('/auth/login', { method: 'POST', body: { email, contrasena }, auth: false }),

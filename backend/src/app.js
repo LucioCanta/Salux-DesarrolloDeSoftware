@@ -39,16 +39,20 @@ app.use(
   })
 );
 
-// Límite estricto para login/registro (mitiga fuerza bruta)
-const limiterAuth = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { ok: false, message: 'Demasiados intentos. Probá de nuevo más tarde.' },
-});
-app.use('/api/auth/login', limiterAuth);
-app.use('/api/auth/register', limiterAuth);
+// Límite estricto para login/registro (mitiga fuerza bruta).
+// Cada ruta necesita su PROPIA instancia: express-rate-limit cuenta por IP,
+// así que reutilizar una sola instancia para dos rutas distintas hace que
+// compartan el mismo cupo de intentos en vez de tener uno independiente cada una.
+const crearLimiterAuth = () =>
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { ok: false, message: 'Demasiados intentos. Probá de nuevo más tarde.' },
+  });
+app.use('/api/auth/login', crearLimiterAuth());
+app.use('/api/auth/register', crearLimiterAuth());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/especialidades', especialidadRoutes);

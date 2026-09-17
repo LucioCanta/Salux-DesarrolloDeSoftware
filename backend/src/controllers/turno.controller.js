@@ -7,19 +7,19 @@ const crearTurno = async (req, res) => {
     const { medicoId, fechaYhora } = req.body;
     const usuarioId = req.usuario.id;
 
-    const paciente = await prisma.paciente.findUnique({
-      where: { usuarioId: usuarioId }
-    });
+    const [paciente, medico] = await Promise.all([
+      prisma.paciente.findUnique({ where: { usuarioId: usuarioId } }),
+      prisma.medico.findUnique({
+        where: { idMedico: medicoId },
+        include: { usuario: { select: { activo: true } } }
+      }),
+    ]);
 
     if (!paciente) {
       return res.status(404).json({ ok: false, message: 'Tu usuario no tiene un perfil de paciente asociado' });
     }
 
-    const medico = await prisma.medico.findUnique({
-      where: { idMedico: medicoId }
-    });
-
-    if (!medico) {
+    if (!medico || !medico.usuario.activo) {
       return res.status(404).json({ ok: false, message: 'El médico indicado no existe' });
     }
 
@@ -136,6 +136,14 @@ const actualizarEstadoTurno = async (req, res) => {
     // Un paciente solo puede cancelar su propio turno, no confirmarlo ni finalizarlo
     if (esPaciente && !esMedico && !esAdmin && estado !== 'CANCELADO') {
       return res.status(403).json({ ok: false, message: 'Como paciente solo podés cancelar tu turno' });
+    }
+
+    // Los estados finales no admiten más transiciones (evita "revivir" un turno ya cerrado)
+    if (turno.estado === 'FINALIZADO' || turno.estado === 'CANCELADO') {
+      return res.status(409).json({
+        ok: false,
+        message: `El turno ya está ${turno.estado.toLowerCase()} y no admite más cambios`
+      });
     }
 
     const turnoActualizado = await prisma.turno.update({

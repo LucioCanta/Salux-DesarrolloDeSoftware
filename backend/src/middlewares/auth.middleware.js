@@ -13,16 +13,33 @@ const verificarToken = (req, res, next) => {
   }
 
   // 2. Verificamos que el token sea auténtico y no haya expirado
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
     if (err) {
       return res.status(401).json({ ok: false, message: 'Token inválido o expirado' });
     }
-    
-    // 3. Si está todo bien, guardamos los datos del usuario en la request
-    req.usuario = decoded; 
-    
-    // 4. Le decimos a Express que deje pasar la petición al controlador
-    next(); 
+
+    try {
+      // 3. Re-chequeamos en la base que la cuenta siga activa: un JWT firmado
+      // antes de que un admin desactive la cuenta seguiría siendo válido
+      // hasta su vencimiento (2h) si no volvemos a mirar la base acá.
+      const usuario = await prisma.usuario.findUnique({
+        where: { idUsuario: decoded.id },
+        select: { activo: true }
+      });
+
+      if (!usuario || !usuario.activo) {
+        return res.status(403).json({ ok: false, message: 'Tu cuenta está desactivada. Contactá a un administrador.' });
+      }
+
+      // 4. Si está todo bien, guardamos los datos del usuario en la request
+      req.usuario = decoded;
+
+      // 5. Le decimos a Express que deje pasar la petición al controlador
+      next();
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ ok: false, error: 'Error interno al verificar la sesión' });
+    }
   });
 };
 const verificarAdmin = async (req, res, next) => {

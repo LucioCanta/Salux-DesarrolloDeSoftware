@@ -1,7 +1,7 @@
 const { z } = require('zod');
 
 const crearTurnoSchema = z.object({
-  medicoId: z.coerce.number().int().positive('medicoId inválido'),
+  medicoId: z.number().int().positive('medicoId inválido'),
   fechaYhora: z
     .string()
     .datetime({ message: 'fechaYhora debe ser una fecha ISO válida' })

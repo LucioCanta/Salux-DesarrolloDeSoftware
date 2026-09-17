@@ -2,6 +2,10 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const prisma = require('../config/prisma');
 
+// Hash "señuelo" contra el que comparar cuando el email no existe, para que
+// bcrypt.compare tarde lo mismo en ambos casos (ver login más abajo).
+const HASH_SENUELO = bcrypt.hashSync('salux-timing-guard', 12);
+
 const register = async (req, res) => {
   try {
     // 1. Recibimos los datos del cliente (React)
@@ -44,6 +48,10 @@ const register = async (req, res) => {
 
   } catch (error) {
     console.error(error);
+    // Carrera entre dos registros simultáneos con el mismo email/dni
+    if (error.code === 'P2002') {
+      return res.status(400).json({ ok: false, message: 'El email o DNI ya está registrado' });
+    }
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -57,13 +65,11 @@ const login = async (req, res) => {
       include: { paciente: true, medico: true, admin: true }
     });
 
-    if (!usuario) {
-      return res.status(401).json({ ok: false, message: 'Credenciales inválidas' });
-    }
-
-    // 2. Comparamos la contraseña encriptada
-    const passwordValida = await bcrypt.compare(contrasena, usuario.contrasena);
-    if (!passwordValida) {
+    // 2. Comparamos la contraseña encriptada. Corremos bcrypt.compare SIEMPRE
+    // (incluso si el usuario no existe, contra un hash "señuelo") para que el
+    // tiempo de respuesta no delate si un email está registrado o no.
+    const passwordValida = await bcrypt.compare(contrasena, usuario?.contrasena || HASH_SENUELO);
+    if (!usuario || !passwordValida) {
       return res.status(401).json({ ok: false, message: 'Credenciales inválidas' });
     }
 
