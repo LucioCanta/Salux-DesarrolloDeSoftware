@@ -10,7 +10,7 @@
  * NUNCA hardcodees credenciales aquí.
  */
 
-require('dotenv').config();
+require('dotenv').config({ override: true });
 const bcrypt = require('bcryptjs');
 const prisma = require('./src/config/prisma');
 
