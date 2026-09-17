@@ -34,8 +34,10 @@ services:
     depends_on:
       mysql-db:
         condition: service_healthy
-    # Aplica migraciones pendientes antes de levantar el servidor
-    command: sh -c "npx prisma migrate deploy && node src/app.js"
+    # Aplica migraciones pendientes antes de levantar el servidor.
+    # Usamos el binario local en vez de "npx prisma" para no depender de
+    # que npx salga a internet a resolver el paquete en cada arranque.
+    command: sh -c "./node_modules/.bin/prisma migrate deploy && node src/app.js"
 
 volumes:
   mysql_data:
