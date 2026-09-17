@@ -35,9 +35,10 @@ services:
       mysql-db:
         condition: service_healthy
     # Aplica migraciones pendientes antes de levantar el servidor.
-    # Usamos el binario local en vez de "npx prisma" para no depender de
-    # que npx salga a internet a resolver el paquete en cada arranque.
-    command: sh -c "./node_modules/.bin/prisma migrate deploy && node src/app.js"
+    # Se invoca el archivo real del paquete con node en vez de depender de
+    # node_modules/.bin (algunos entornos Docker/Windows no generan esos
+    # symlinks) ni de npx (puede intentar resolver el paquete por red).
+    command: sh -c "node node_modules/prisma/build/index.js migrate deploy && node src/app.js"
 
 volumes:
   mysql_data:
