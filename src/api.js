@@ -66,4 +66,8 @@ export const api = {
   medicos: () => request('/medicos'),
   crearTurno: (medicoId, fechaYhora) =>
     request('/turnos', { method: 'POST', body: { medicoId, fechaYhora } }),
+  crearEspecialidad: (nombre) =>
+    request('/especialidades', { method: 'POST', body: { nombre } }),
+  crearMedico: (datos) =>
+    request('/medicos', { method: 'POST', body: datos }),
 };

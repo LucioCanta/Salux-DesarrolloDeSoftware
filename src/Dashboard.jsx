@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from './api';
 import NuevoTurnoModal from './NuevoTurnoModal';
+import AdminAltaModal from './AdminAltaModal';
 
 const ESTADO_TEXTO = { PENDIENTE: 'Pendiente', CONFIRMADO: 'Confirmado', CANCELADO: 'Cancelado', FINALIZADO: 'Finalizado' };
 
@@ -71,6 +72,7 @@ function Dashboard({ usuario, onLogout }) {
   const [errorTurnos, setErrorTurnos] = useState('');
   const [ahora] = useState(() => Date.now());
   const [mostrarModalTurno, setMostrarModalTurno] = useState(false);
+  const [mostrarModalAlta, setMostrarModalAlta] = useState(false);
 
   const cargarMisTurnos = () => {
     api.misTurnos()
@@ -481,15 +483,26 @@ function Dashboard({ usuario, onLogout }) {
               </span>
               <h1 className="font-bold" style={{ fontSize: modoAdultoMayor ? '32px' : '24px' }}>Gestión de turnos</h1>
             </div>
-            <button
-              onClick={() => alert('Modal de agregar disponibilidad en desarrollo')}
-              className={`font-semibold px-4 py-2.5 rounded-xl shadow transition ${
-                altoContraste ? 'bg-black text-white hover:bg-slate-800' : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}
-              style={{ fontSize: modoAdultoMayor ? '18px' : '14px', minHeight: modoAdultoMayor ? '60px' : 'auto' }}
-            >
-              + Agregar disponibilidad
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setMostrarModalAlta(true)}
+                className={`font-semibold px-4 py-2.5 rounded-xl shadow transition ${
+                  altoContraste ? 'bg-black text-white hover:bg-slate-800' : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+                style={{ fontSize: modoAdultoMayor ? '18px' : '14px', minHeight: modoAdultoMayor ? '60px' : 'auto' }}
+              >
+                + Especialidad / Médico
+              </button>
+              <button
+                onClick={() => alert('Modal de agregar disponibilidad en desarrollo')}
+                className={`font-semibold px-4 py-2.5 rounded-xl border transition ${
+                  altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+                }`}
+                style={{ fontSize: modoAdultoMayor ? '18px' : '14px', minHeight: modoAdultoMayor ? '60px' : 'auto' }}
+              >
+                + Agregar disponibilidad
+              </button>
+            </div>
           </div>
 
           {/* Tarjetas de estadísticas en tiempo real */}
@@ -828,6 +841,10 @@ function Dashboard({ usuario, onLogout }) {
 
       {mostrarModalTurno && (
         <NuevoTurnoModal onClose={() => setMostrarModalTurno(false)} onCreado={turnoCreado} />
+      )}
+
+      {mostrarModalAlta && (
+        <AdminAltaModal onClose={() => setMostrarModalAlta(false)} />
       )}
     </div>
   );
