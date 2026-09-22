@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+/* "Reducir animaciones" (menú de accesibilidad): apaga transiciones y
+   animaciones CSS en todo lo que cuelgue de .reduce-motion, sin tener que
+   condicionar cada className de transition/animation una por una. */
+.reduce-motion,
+.reduce-motion * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}

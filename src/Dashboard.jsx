@@ -328,7 +328,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   return (
     <div
       style={{ fontSize: modoAdultoMayor ? '20px' : '16px' }}
-      className={`min-h-screen transition-colors ${reducirAnimaciones ? 'transition-none' : 'duration-200'} ${
+      className={`min-h-screen transition-colors ${reducirAnimaciones ? 'transition-none reduce-motion' : 'duration-200'} ${
         altoContraste ? 'bg-white text-black high-contrast' :
         modoOscuro ? 'bg-[#0F172A] text-[#F1F5F9]' : 'bg-[#F8FAFC] text-[#1E293B]'
       }`}
