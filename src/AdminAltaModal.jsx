@@ -146,6 +146,7 @@ function FormMedico() {
   const [apellido, setApellido] = useState('');
   const [matricula, setMatricula] = useState('');
   const [consultorio, setConsultorio] = useState('');
+  const [duracionTurnoMinutos, setDuracionTurnoMinutos] = useState('30');
   const [especialidadesIds, setEspecialidadesIds] = useState([]);
 
   const [enviando, setEnviando] = useState(false);
@@ -174,9 +175,9 @@ function FormMedico() {
     setEnviando(true);
     try {
       const nomYape = `${nombre.trim()} ${apellido.trim()}`.trim();
-      const { data } = await api.crearMedico({ email, dni, contrasena, nomYape, matricula, consultorio, especialidadesIds });
+      const { data } = await api.crearMedico({ email, dni, contrasena, nomYape, matricula, consultorio, especialidadesIds, duracionTurnoMinutos });
       setExito(`Médico "${data.nomYape}" creado con éxito.`);
-      setEmail(''); setDni(''); setContrasena(''); setNombre(''); setApellido(''); setMatricula(''); setConsultorio(''); setEspecialidadesIds([]);
+      setEmail(''); setDni(''); setContrasena(''); setNombre(''); setApellido(''); setMatricula(''); setConsultorio(''); setDuracionTurnoMinutos('30'); setEspecialidadesIds([]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -235,6 +236,20 @@ function FormMedico() {
           </div>
           <p className="text-slate-500 text-xs mt-1">Solo el número/letra, ej: "A" o "204" — no escribas la palabra "Consultorio"</p>
         </div>
+      </div>
+
+      <div>
+        <label className={labelClase}>Duración del turno (minutos)</label>
+        <input
+          type="number"
+          value={duracionTurnoMinutos}
+          onChange={(e) => setDuracionTurnoMinutos(e.target.value)}
+          min={5}
+          max={240}
+          step={5}
+          className={inputClase}
+        />
+        <p className="text-slate-500 text-xs mt-1">Cuánto dura cada turno de este médico. Se usa para generar los horarios disponibles en el wizard.</p>
       </div>
 
       <div>

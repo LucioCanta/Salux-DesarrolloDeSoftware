@@ -24,4 +24,20 @@ const cambiarContrasenaSchema = z.object({
   contrasenaNueva: z.string().min(8, 'La contraseña nueva debe tener al menos 8 caracteres'),
 });
 
-module.exports = { registerSchema, loginSchema, actualizarPerfilSchema, cambiarContrasenaSchema };
+const olvideContrasenaSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Email inválido'),
+});
+
+const resetearContrasenaSchema = z.object({
+  token: z.string().min(1, 'Falta el token'),
+  contrasenaNueva: z.string().min(8, 'La contraseña nueva debe tener al menos 8 caracteres'),
+});
+
+module.exports = {
+  registerSchema,
+  loginSchema,
+  actualizarPerfilSchema,
+  cambiarContrasenaSchema,
+  olvideContrasenaSchema,
+  resetearContrasenaSchema,
+};

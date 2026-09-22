@@ -100,12 +100,101 @@ const obtenerDisponibilidadDeMedico = async (req, res) => {
       return res.status(404).json({ ok: false, message: 'Médico no encontrado' });
     }
 
-    const disponibilidades = await prisma.disponibilidad.findMany({
-      where: { medicoId },
-      orderBy: [{ diaSemana: 'asc' }, { horaInicioMinutos: 'asc' }],
+    const [disponibilidades, ausencias] = await Promise.all([
+      prisma.disponibilidad.findMany({
+        where: { medicoId },
+        orderBy: [{ diaSemana: 'asc' }, { horaInicioMinutos: 'asc' }],
+      }),
+      // Solo las ausencias que todavía pueden afectar una reserva futura
+      prisma.ausenciaMedico.findMany({
+        where: { medicoId, fechaFin: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } },
+        orderBy: { fechaInicio: 'asc' },
+      }),
+    ]);
+
+    res.json({ ok: true, data: { duracionTurnoMinutos: medico.duracionTurnoMinutos, disponibilidades, ausencias } });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+};
+
+// ==========================================
+// Ausencias puntuales (vacaciones, un día que el médico avisa que no atiende)
+// ==========================================
+
+const crearAusencia = async (req, res) => {
+  try {
+    const medico = await resolverMedico(req.usuario.id);
+    if (!medico) {
+      return res.status(403).json({ ok: false, message: 'Acceso denegado: tu perfil no es de médico' });
+    }
+
+    const { fechaInicio, fechaFin, motivo } = req.body;
+
+    // Guardamos siempre como medianoche UTC del día que se eligió (ya validado
+    // como "AAAA-MM-DD" por Zod). Un día calendario es un concepto absoluto
+    // que no depende de la zona horaria de quien lo mire después — ver la
+    // misma convención en validarHorarioParaTurno (turno.controller.js) y en
+    // generarHorariosDelDia (frontend/turnoUtils.js).
+    const nueva = await prisma.ausenciaMedico.create({
+      data: {
+        fechaInicio: new Date(`${fechaInicio}T00:00:00Z`),
+        fechaFin: new Date(`${fechaFin}T00:00:00Z`),
+        motivo: motivo || null,
+        medicoId: medico.idMedico,
+      },
     });
 
-    res.json({ ok: true, data: { duracionTurnoMinutos: medico.duracionTurnoMinutos, disponibilidades } });
+    res.status(201).json({ ok: true, message: 'Ausencia registrada', data: nueva });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+};
+
+const obtenerMisAusencias = async (req, res) => {
+  try {
+    const medico = await resolverMedico(req.usuario.id);
+    if (!medico) {
+      return res.status(403).json({ ok: false, message: 'Acceso denegado: tu perfil no es de médico' });
+    }
+
+    const ausencias = await prisma.ausenciaMedico.findMany({
+      where: { medicoId: medico.idMedico },
+      orderBy: { fechaInicio: 'asc' },
+    });
+
+    res.json({ ok: true, data: ausencias });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+};
+
+const eliminarAusencia = async (req, res) => {
+  try {
+    const medico = await resolverMedico(req.usuario.id);
+    if (!medico) {
+      return res.status(403).json({ ok: false, message: 'Acceso denegado: tu perfil no es de médico' });
+    }
+
+    const idAusencia = parseInt(req.params.id, 10);
+    if (Number.isNaN(idAusencia)) {
+      return res.status(400).json({ ok: false, message: 'id de ausencia inválido' });
+    }
+
+    const ausencia = await prisma.ausenciaMedico.findUnique({ where: { idAusencia } });
+    if (!ausencia) {
+      return res.status(404).json({ ok: false, message: 'Ausencia no encontrada' });
+    }
+    if (ausencia.medicoId !== medico.idMedico) {
+      return res.status(403).json({ ok: false, message: 'Esa ausencia no te pertenece' });
+    }
+
+    await prisma.ausenciaMedico.delete({ where: { idAusencia } });
+
+    res.json({ ok: true, message: 'Ausencia eliminada' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
@@ -117,4 +206,7 @@ module.exports = {
   obtenerMisDisponibilidades,
   eliminarDisponibilidad,
   obtenerDisponibilidadDeMedico,
+  crearAusencia,
+  obtenerMisAusencias,
+  eliminarAusencia,
 };

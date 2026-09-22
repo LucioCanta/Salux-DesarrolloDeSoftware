@@ -59,6 +59,7 @@ const crearLimiterAuth = () =>
   });
 app.use('/api/auth/login', crearLimiterAuth());
 app.use('/api/auth/register', crearLimiterAuth());
+app.use('/api/auth/olvide-contrasena', crearLimiterAuth());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/especialidades', especialidadRoutes);

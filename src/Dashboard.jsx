@@ -3,6 +3,8 @@ import { api } from './api';
 import NuevoTurnoModal from './NuevoTurnoModal';
 import AdminAltaModal from './AdminAltaModal';
 import PerfilModal from './PerfilModal';
+import EditarMedicoModal from './EditarMedicoModal';
+import ReprogramarTurnoModal from './ReprogramarTurnoModal';
 
 const ESTADO_TEXTO = { PENDIENTE: 'Pendiente', CONFIRMADO: 'Confirmado', CANCELADO: 'Cancelado', FINALIZADO: 'Finalizado' };
 const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -23,6 +25,7 @@ function formatearTurno(t) {
   const horaTexto = fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
   return {
     id: t.idTurno,
+    medicoId: t.medico?.idMedico,
     especialidad: t.medico?.especialidades?.[0]?.nombre || 'Consulta general',
     medico: t.medico?.usuario?.nomYape || 'Médico',
     consultorio: t.medico?.consultorio ? `Consultorio ${t.medico.consultorio}` : 'Consultorio a confirmar',
@@ -30,6 +33,7 @@ function formatearTurno(t) {
     hora: horaTexto,
     estado: ESTADO_TEXTO[t.estado] || t.estado,
     fechaISO: t.fechaYhora,
+    confirmadoPorPaciente: !!t.confirmadoPorPaciente,
   };
 }
 
@@ -62,6 +66,7 @@ function formatearTurnoMedico(t) {
     hora: horaTexto,
     estado: ESTADO_TEXTO[t.estado] || t.estado,
     fechaISO: t.fechaYhora,
+    confirmadoPorPaciente: !!t.confirmadoPorPaciente,
   };
 }
 
@@ -135,6 +140,22 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
     }
   };
 
+  const confirmarAsistencia = async (id) => {
+    try {
+      await api.confirmarAsistencia(id);
+      setListaTurnos((prev) => prev.map((t) => (t.id === id ? { ...t, confirmadoPorPaciente: true } : t)));
+    } catch (err) {
+      alert(`No se pudo confirmar la asistencia: ${err.message}`);
+    }
+  };
+
+  const [turnoAReprogramar, setTurnoAReprogramar] = useState(null);
+  const turnoReprogramado = () => {
+    setTurnoAReprogramar(null);
+    setCargandoTurnos(true);
+    cargarMisTurnos();
+  };
+
   const turnosFiltrados = listaTurnos.filter(turno => {
     if (filtroEstado === 'Todos') return true;
     if (filtroEstado === 'Confirmados') return turno.estado === 'Confirmado';
@@ -201,6 +222,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   // Data table de médicos (a diferencia de api.medicos(), esta trae también
   // los inactivos para que el admin pueda reactivarlos)
   const [tabAdmin, setTabAdmin] = useState('turnos');
+  const [medicoEditando, setMedicoEditando] = useState(null);
   const [medicosAdmin, setMedicosAdmin] = useState([]);
   const [cargandoMedicosAdmin, setCargandoMedicosAdmin] = useState(() => esAdmin);
   const [errorMedicosAdmin, setErrorMedicosAdmin] = useState('');
@@ -309,6 +331,64 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
     } catch (err) {
       alert(`No se pudo eliminar la franja horaria: ${err.message}`);
     }
+  };
+
+  // Ausencias puntuales (vacaciones, un día que el médico avisa que no atiende)
+  const [ausencias, setAusencias] = useState([]);
+  const [cargandoAusencias, setCargandoAusencias] = useState(() => esMedico);
+  const [errorAusencias, setErrorAusencias] = useState('');
+  const [nuevaAusenciaDesde, setNuevaAusenciaDesde] = useState('');
+  const [nuevaAusenciaHasta, setNuevaAusenciaHasta] = useState('');
+  const [nuevaAusenciaMotivo, setNuevaAusenciaMotivo] = useState('');
+  const [guardandoAusencia, setGuardandoAusencia] = useState(false);
+  const [errorNuevaAusencia, setErrorNuevaAusencia] = useState('');
+
+  useEffect(() => {
+    if (!esMedico) return;
+    api.misAusencias()
+      .then(({ data }) => setAusencias(data))
+      .catch((err) => setErrorAusencias(err.message))
+      .finally(() => setCargandoAusencias(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const agregarAusencia = async (e) => {
+    e.preventDefault();
+    setErrorNuevaAusencia('');
+    setGuardandoAusencia(true);
+    try {
+      const { data } = await api.crearAusencia({
+        fechaInicio: nuevaAusenciaDesde,
+        fechaFin: nuevaAusenciaHasta,
+        motivo: nuevaAusenciaMotivo,
+      });
+      setAusencias((prev) => [...prev, data].sort((a, b) => new Date(a.fechaInicio) - new Date(b.fechaInicio)));
+      setNuevaAusenciaDesde('');
+      setNuevaAusenciaHasta('');
+      setNuevaAusenciaMotivo('');
+    } catch (err) {
+      setErrorNuevaAusencia(err.message);
+    } finally {
+      setGuardandoAusencia(false);
+    }
+  };
+
+  const eliminarAusenciaHandler = async (idAusencia) => {
+    try {
+      await api.eliminarAusencia(idAusencia);
+      setAusencias((prev) => prev.filter((a) => a.idAusencia !== idAusencia));
+    } catch (err) {
+      alert(`No se pudo eliminar la ausencia: ${err.message}`);
+    }
+  };
+
+  // Las fechas de ausencia se guardan como medianoche UTC del día elegido
+  // (ver disponibilidad.controller.js) — para mostrarlas hay que leerlas con
+  // los componentes UTC, si no un navegador en un huso negativo (Argentina)
+  // las corre un día para atrás.
+  const formatearFechaAusencia = (iso) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
   };
 
   // Cierra el menú mobile con la tecla Escape (sección 4.2 del documento)
@@ -921,7 +1001,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   <table className="w-full text-left" style={{ fontSize: modoAdultoMayor ? '16px' : '14px' }}>
                     <thead>
                       <tr className={`border-b ${altoContraste ? 'border-black' : 'border-slate-700'}`}>
-                        {['Médico', 'Email', 'DNI', 'Matrícula', 'Consultorio', 'Especialidades', 'Estado', ''].map((col) => (
+                        {['Médico', 'Email', 'DNI', 'Matrícula', 'Consultorio', 'Duración', 'Especialidades', 'Estado', ''].map((col) => (
                           <th key={col} className={`px-4 py-3 font-semibold uppercase tracking-wider ${altoContraste ? 'text-black' : 'text-slate-400'}`} style={{ fontSize: modoAdultoMayor ? '13px' : '11px' }}>
                             {col}
                           </th>
@@ -936,6 +1016,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                           <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.usuario.dni}</td>
                           <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.matricula}</td>
                           <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.consultorio || '—'}</td>
+                          <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.duracionTurnoMinutos} min</td>
                           <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>
                             {medico.especialidades.map((e) => e.nombre).join(', ') || '—'}
                           </td>
@@ -944,7 +1025,15 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                               {medico.usuario.activo ? 'Activo' : 'Inactivo'}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => setMedicoEditando(medico)}
+                              className={`border px-3 py-1.5 rounded-lg text-sm font-semibold transition mr-2 ${
+                                altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+                              }`}
+                            >
+                              Editar
+                            </button>
                             <button
                               onClick={() => toggleEstadoMedico(medico)}
                               className={`border px-3 py-1.5 rounded-lg text-sm font-semibold transition ${
@@ -1018,6 +1107,9 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${badgeColor}`}>{turno.estado}</span>
+                        {turno.confirmadoPorPaciente && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700">✓ Paciente confirmó</span>
+                        )}
                       </div>
                       <h3 className="font-bold text-lg">{turno.paciente}</h3>
                       <p className={`text-sm mt-1 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>📅 {turno.fecha} — <strong>{turno.hora}</strong></p>
@@ -1154,6 +1246,94 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               ))}
             </div>
           )}
+
+          {/* ========================================== */}
+          {/* Ausencias puntuales                        */}
+          {/* ========================================== */}
+          <div className="pt-4 border-t border-slate-800">
+            <h2 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '22px' : '18px' }}>Ausencias puntuales</h2>
+            <p className="text-slate-400 text-sm mb-4">Para vacaciones o un día suelto que no atendés, aunque caiga en tu franja habitual. Los pacientes no van a poder reservar en estas fechas.</p>
+
+            <form onSubmit={agregarAusencia} className={`p-5 rounded-xl border space-y-4 ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800'}`}>
+              {errorNuevaAusencia && (
+                <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                  {errorNuevaAusencia}
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Desde</label>
+                  <input
+                    type="date"
+                    value={nuevaAusenciaDesde}
+                    onChange={(e) => setNuevaAusenciaDesde(e.target.value)}
+                    required
+                    className={`w-full px-3 py-2.5 rounded-lg border ${altoContraste ? 'bg-white border-black text-black' : 'bg-slate-950 border-slate-700 text-slate-200'}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Hasta</label>
+                  <input
+                    type="date"
+                    value={nuevaAusenciaHasta}
+                    onChange={(e) => setNuevaAusenciaHasta(e.target.value)}
+                    required
+                    className={`w-full px-3 py-2.5 rounded-lg border ${altoContraste ? 'bg-white border-black text-black' : 'bg-slate-950 border-slate-700 text-slate-200'}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Motivo (opcional)</label>
+                  <input
+                    type="text"
+                    value={nuevaAusenciaMotivo}
+                    onChange={(e) => setNuevaAusenciaMotivo(e.target.value)}
+                    placeholder="Ej: Vacaciones"
+                    maxLength={191}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${altoContraste ? 'bg-white border-black text-black' : 'bg-slate-950 border-slate-700 text-slate-200'}`}
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={guardandoAusencia}
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-lg transition"
+              >
+                {guardandoAusencia ? 'Agregando...' : '+ Agregar ausencia'}
+              </button>
+            </form>
+
+            {cargandoAusencias && (
+              <div className="text-slate-400 text-sm py-4">Cargando tus ausencias...</div>
+            )}
+
+            {errorAusencias && !cargandoAusencias && (
+              <div className="mt-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                No se pudieron cargar tus ausencias: {errorAusencias}
+              </div>
+            )}
+
+            {!cargandoAusencias && !errorAusencias && ausencias.length > 0 && (
+              <div className="space-y-2 mt-4">
+                {ausencias.map((a) => (
+                  <div
+                    key={a.idAusencia}
+                    className={`px-4 py-3 rounded-lg border flex items-center justify-between ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800'}`}
+                  >
+                    <span className="font-medium">
+                      {formatearFechaAusencia(a.fechaInicio)} a {formatearFechaAusencia(a.fechaFin)}
+                      {a.motivo && <span className="text-slate-400 font-normal"> — {a.motivo}</span>}
+                    </span>
+                    <button
+                      onClick={() => eliminarAusenciaHandler(a.idAusencia)}
+                      className="text-red-400 hover:text-red-300 text-xs font-semibold"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </main>
       ) : vistaActual === 'mis-turnos' ? (
         <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
@@ -1244,10 +1424,26 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                  <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
+                    {!noCancelable && !turno.confirmadoPorPaciente && (
+                      <button
+                        onClick={() => confirmarAsistencia(turno.id)}
+                        className={`border px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                          altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-emerald-500 text-emerald-400 hover:bg-emerald-600/10'
+                        }`}
+                      >
+                        Confirmo que voy
+                      </button>
+                    )}
+                    {!noCancelable && turno.confirmadoPorPaciente && (
+                      <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-emerald-100 text-emerald-700">
+                        ✓ Confirmaste tu asistencia
+                      </span>
+                    )}
                     <button
-                      onClick={() => alert('Reprogramar turno en desarrollo')}
-                      className={`border px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                      onClick={() => setTurnoAReprogramar(turno)}
+                      disabled={noCancelable}
+                      className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-blue-500 text-blue-400 hover:bg-blue-600/10'
                       }`}
                     >
@@ -1379,7 +1575,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           {esPaciente && (
             <div>
               <h3 className="font-bold mb-4" style={{ fontSize: modoAdultoMayor ? '24px' : '18px' }}>¿Qué querés hacer hoy?</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div onClick={() => setMostrarModalTurno(true)} className={`p-5 rounded-xl border shadow-sm cursor-pointer transition ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 hover:border-blue-500'}`}>
                   <div className="w-10 h-10 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold mb-3">📅</div>
                   <h4 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '20px' : '16px' }}>Solicitar turno</h4>
@@ -1392,13 +1588,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   )}
                   <div className="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold mb-3">📋</div>
                   <h4 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '20px' : '16px' }}>Mis turnos</h4>
-                  <p className="text-slate-400" style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>Revisá tus próximas citas</p>
-                </div>
-
-                <div onClick={() => setVistaActual('mis-turnos')} className={`p-5 rounded-xl border shadow-sm cursor-pointer transition ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 hover:border-blue-500'}`}>
-                  <div className="w-10 h-10 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center font-bold mb-3">❌</div>
-                  <h4 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '20px' : '16px' }}>Cancelar turno</h4>
-                  <p className="text-slate-400" style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>Anulá turnos que no necesites</p>
+                  <p className="text-slate-400" style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>Revisá, cancelá o reprogramá tus citas</p>
                 </div>
 
                 <div onClick={() => setVistaActual('historial')} className={`p-5 rounded-xl border shadow-sm cursor-pointer transition ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 hover:border-blue-500'}`}>
@@ -1441,6 +1631,14 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
         <NuevoTurnoModal onClose={() => setMostrarModalTurno(false)} onCreado={turnoCreado} />
       )}
 
+      {turnoAReprogramar && (
+        <ReprogramarTurnoModal
+          turno={turnoAReprogramar}
+          onClose={() => setTurnoAReprogramar(null)}
+          onReprogramado={turnoReprogramado}
+        />
+      )}
+
       {mostrarModalAlta && (
         <AdminAltaModal onClose={() => { setMostrarModalAlta(false); cargarMedicosAdmin(); }} />
       )}
@@ -1450,6 +1648,20 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           usuario={usuario}
           onClose={() => setMostrarModalPerfil(false)}
           onActualizado={onUsuarioActualizado}
+        />
+      )}
+
+      {medicoEditando && (
+        <EditarMedicoModal
+          medico={medicoEditando}
+          onClose={() => setMedicoEditando(null)}
+          onActualizado={(medicoActualizado) => {
+            setMedicosAdmin((prev) => prev.map((m) =>
+              m.idMedico === medicoActualizado.idMedico
+                ? { ...m, consultorio: medicoActualizado.consultorio, duracionTurnoMinutos: medicoActualizado.duracionTurnoMinutos }
+                : m
+            ));
+          }}
         />
       )}
 

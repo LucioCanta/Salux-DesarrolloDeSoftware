@@ -5,7 +5,14 @@ const router = express.Router();
 const authController = require('../controllers/auth.controller');
 const { verificarToken } = require('../middlewares/auth.middleware');
 const validate = require('../middlewares/validate.middleware');
-const { registerSchema, loginSchema, actualizarPerfilSchema, cambiarContrasenaSchema } = require('../schemas/auth.schema');
+const {
+  registerSchema,
+  loginSchema,
+  actualizarPerfilSchema,
+  cambiarContrasenaSchema,
+  olvideContrasenaSchema,
+  resetearContrasenaSchema,
+} = require('../schemas/auth.schema');
 
 // 2. Rutas Públicas (No necesitan token)
 router.post('/register', validate(registerSchema), authController.register);
@@ -13,6 +20,8 @@ router.post('/login', validate(loginSchema), authController.login);
 // Usa el refresh token de la cookie httpOnly, no el Access Token del header
 router.post('/refresh', authController.refresh);
 router.post('/logout', authController.logout);
+router.post('/olvide-contrasena', validate(olvideContrasenaSchema), authController.olvideContrasena);
+router.post('/resetear-contrasena', validate(resetearContrasenaSchema), authController.resetearContrasena);
 
 // 3. Rutas Privadas (Pasan por verificarToken antes de llegar al controlador)
 router.get('/perfil', verificarToken, authController.obtenerPerfil);

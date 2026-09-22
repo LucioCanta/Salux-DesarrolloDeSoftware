@@ -153,4 +153,18 @@ export const api = {
     request(`/especialidades/${idEspecialidad}`, { method: 'DELETE' }),
   crearMedico: (datos) =>
     request('/medicos', { method: 'POST', body: datos }),
+  actualizarMedico: (idMedico, datos) =>
+    request(`/medicos/${idMedico}`, { method: 'PATCH', body: datos }),
+  reprogramarTurno: (idTurno, fechaYhora) =>
+    request(`/turnos/${idTurno}/reprogramar`, { method: 'PATCH', body: { fechaYhora } }),
+  confirmarAsistencia: (idTurno) =>
+    request(`/turnos/${idTurno}/confirmar-asistencia`, { method: 'PATCH' }),
+  solicitarResetContrasena: (email) =>
+    request('/auth/olvide-contrasena', { method: 'POST', body: { email }, auth: false }),
+  resetearContrasena: (token, contrasenaNueva) =>
+    request('/auth/resetear-contrasena', { method: 'POST', body: { token, contrasenaNueva }, auth: false }),
+  misAusencias: () => request('/disponibilidad/ausencias/mias'),
+  crearAusencia: (datos) => request('/disponibilidad/ausencias', { method: 'POST', body: datos }),
+  eliminarAusencia: (idAusencia) =>
+    request(`/disponibilidad/ausencias/${idAusencia}`, { method: 'DELETE' }),
 };

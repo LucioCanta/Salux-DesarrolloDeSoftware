@@ -13,8 +13,13 @@ model Usuario {
   dni         String         @unique
   contrasena  String
   nomYape     String
-  activo      Boolean        @default(true) 
-  
+  activo      Boolean        @default(true)
+
+  // Recuperación de contraseña: token de un solo uso + vencimiento. Ambos
+  // quedan en null mientras no haya un pedido de reset pendiente.
+  resetPasswordToken   String?   @unique
+  resetPasswordExpira  DateTime?
+
   paciente    Paciente?
   medico      Medico?
   admin       Administrador?
@@ -45,6 +50,22 @@ model Medico {
   turnos      Turno[]
   especialidades Especialidad[]
   disponibilidades Disponibilidad[]
+  ausencias   AusenciaMedico[]
+}
+
+// Ausencia puntual del médico (ej: vacaciones, un feriado que decide no
+// atender) — a diferencia de Disponibilidad (que es recurrente semanal),
+// esto es un rango de fechas concreto que se descuenta de la disponibilidad
+// al generar horarios y al validar una reserva.
+model AusenciaMedico {
+  idAusencia  Int      @id @default(autoincrement())
+  // Ambas fechas son inclusive y se comparan solo por día (sin horario)
+  fechaInicio DateTime
+  fechaFin    DateTime
+  motivo      String?
+
+  medicoId    Int
+  medico      Medico   @relation(fields: [medicoId], references: [idMedico])
 }
 
 // Franjas horarias recurrentes semanales en las que un médico atiende
@@ -81,7 +102,11 @@ model Turno {
   idTurno     Int      @id @default(autoincrement())
   fechaYhora  DateTime
   estado      EstadoTurno @default(PENDIENTE)
-  
+  // El paciente confirma que va a asistir, independiente de que el médico
+  // haya confirmado el turno — son dos señales distintas (ver Entrega: "el
+  // paciente también confirma su turno" para bajar el ausentismo).
+  confirmadoPorPaciente Boolean @default(false)
+
   pacienteId  Int
   paciente    Paciente @relation(fields: [pacienteId], references: [idPaciente])
   

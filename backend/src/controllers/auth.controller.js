@@ -1,6 +1,10 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const prisma = require('../config/prisma');
+const { emailResetContrasena } = require('../utils/email');
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 
 // Hash "señuelo" contra el que comparar cuando el email no existe, para que
 // bcrypt.compare tarde lo mismo en ambos casos (ver login más abajo).
@@ -288,6 +292,65 @@ const cambiarContrasena = async (req, res) => {
   }
 };
 
+// Pide el reset: si el email existe y está activo, genera un token de un
+// solo uso (se guarda hasheado, nunca en texto plano) y lo manda por email.
+// La respuesta es SIEMPRE la misma exista o no el email — si no, este
+// endpoint serviría para averiguar qué emails están registrados.
+const olvideContrasena = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const usuario = await prisma.usuario.findUnique({ where: { email } });
+
+    if (usuario && usuario.activo) {
+      const tokenPlano = crypto.randomBytes(32).toString('hex');
+      const tokenHasheado = crypto.createHash('sha256').update(tokenPlano).digest('hex');
+
+      await prisma.usuario.update({
+        where: { idUsuario: usuario.idUsuario },
+        data: {
+          resetPasswordToken: tokenHasheado,
+          resetPasswordExpira: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+        }
+      });
+
+      const origenFrontend = (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',')[0];
+      const link = `${origenFrontend}/?reset=${tokenPlano}`;
+      emailResetContrasena({ to: usuario.email, nombre: usuario.nomYape, link }).catch(() => {});
+    }
+
+    res.json({ ok: true, message: 'Si ese email está registrado, te enviamos un enlace para recuperar tu contraseña.' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+};
+
+// Completa el reset: valida el token (hasheado, comparado contra lo
+// guardado) y su vencimiento, y si es válido cambia la contraseña.
+const resetearContrasena = async (req, res) => {
+  try {
+    const { token, contrasenaNueva } = req.body;
+    const tokenHasheado = crypto.createHash('sha256').update(token).digest('hex');
+
+    const usuario = await prisma.usuario.findUnique({ where: { resetPasswordToken: tokenHasheado } });
+
+    if (!usuario || !usuario.resetPasswordExpira || usuario.resetPasswordExpira.getTime() < Date.now()) {
+      return res.status(400).json({ ok: false, message: 'El enlace no es válido o ya venció. Pedí uno nuevo.' });
+    }
+
+    const hashNuevo = await bcrypt.hash(contrasenaNueva, 12);
+    await prisma.usuario.update({
+      where: { idUsuario: usuario.idUsuario },
+      data: { contrasena: hashNuevo, resetPasswordToken: null, resetPasswordExpira: null }
+    });
+
+    res.json({ ok: true, message: 'Contraseña actualizada. Ya podés iniciar sesión.' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -295,5 +358,7 @@ module.exports = {
   logout,
   obtenerPerfil,
   actualizarPerfil,
-  cambiarContrasena
+  cambiarContrasena,
+  olvideContrasena,
+  resetearContrasena
 };

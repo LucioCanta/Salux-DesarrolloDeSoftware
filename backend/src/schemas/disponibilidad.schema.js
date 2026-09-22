@@ -11,4 +11,20 @@ const crearDisponibilidadSchema = z
     path: ['horaFinMinutos'],
   });
 
-module.exports = { crearDisponibilidadSchema };
+const fechaSoloDia = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD');
+
+const crearAusenciaSchema = z
+  .object({
+    fechaInicio: fechaSoloDia,
+    fechaFin: fechaSoloDia,
+    motivo: z.preprocess(
+      (valor) => (valor === '' || valor == null ? undefined : valor),
+      z.string().trim().max(191).optional()
+    ),
+  })
+  .refine((datos) => datos.fechaFin >= datos.fechaInicio, {
+    message: 'La fecha de fin no puede ser anterior a la de inicio',
+    path: ['fechaFin'],
+  });
+
+module.exports = { crearDisponibilidadSchema, crearAusenciaSchema };

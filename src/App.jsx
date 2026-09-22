@@ -12,12 +12,17 @@ function App() {
   const [verificandoSesion, setVerificandoSesion] = useState(() => !getUsuarioGuardado());
   const [modoAdultoMayor, setModoAdultoMayor] = useState(false);
   const [mostrarPassword, setMostrarPassword] = useState(false);
-  const [modo, setModo] = useState('login'); // 'login' | 'registro'
+  // Si el link del mail de "recuperar contraseña" trae ?reset=TOKEN, arrancamos
+  // directo en esa pantalla en vez del login.
+  const [resetToken] = useState(() => new URLSearchParams(window.location.search).get('reset'));
+  const [modo, setModo] = useState(() => (resetToken ? 'reset' : 'login')); // 'login' | 'registro' | 'olvide' | 'reset'
   const [email, setEmail] = useState('');
   const [contrasena, setContrasena] = useState('');
+  const [confirmarContrasena, setConfirmarContrasena] = useState('');
   const [nomYape, setNomYape] = useState('');
   const [dni, setDni] = useState('');
   const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
   const [enviando, setEnviando] = useState(false);
 
   // Al cargar la app pedimos un Access Token nuevo con el refresh token de
@@ -67,9 +72,49 @@ function App() {
     }
   };
 
+  const handleOlvideContrasena = async (e) => {
+    e.preventDefault();
+    setError('');
+    setMensaje('');
+    setEnviando(true);
+    try {
+      const { message } = await api.solicitarResetContrasena(email);
+      setMensaje(message);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const handleResetearContrasena = async (e) => {
+    e.preventDefault();
+    setError('');
+    setMensaje('');
+    if (contrasena !== confirmarContrasena) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+    setEnviando(true);
+    try {
+      await api.resetearContrasena(resetToken, contrasena);
+      setMensaje('Contraseña actualizada. Ya podés iniciar sesión.');
+      setContrasena('');
+      setConfirmarContrasena('');
+      // Limpiamos el ?reset=... de la URL para que un F5 no reintente el token ya usado
+      window.history.replaceState({}, '', window.location.pathname);
+      setModo('login');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
   const cambiarModo = (nuevoModo) => {
     setModo(nuevoModo);
     setError('');
+    setMensaje('');
   };
 
   const handleLogout = async () => {
@@ -124,7 +169,9 @@ function App() {
         {/* Cabecera / Título */}
         <div className="text-center mb-6">
           <h1 className={`font-bold tracking-tight text-white ${modoAdultoMayor ? 'text-4xl' : 'text-2xl'}`}>Salux</h1>
-          <p className={`text-slate-400 mt-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>Sistema de Gestión de Turnos Médicos</p>
+          <p className={`text-slate-400 mt-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
+            {modo === 'olvide' ? 'Recuperar contraseña' : modo === 'reset' ? 'Elegí tu nueva contraseña' : 'Sistema de Gestión de Turnos Médicos'}
+          </p>
         </div>
 
         {error && (
@@ -132,8 +179,88 @@ function App() {
             {error}
           </div>
         )}
+        {mensaje && (
+          <div className="mb-4 px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">
+            {mensaje}
+          </div>
+        )}
 
-        {/* Formulario */}
+        {/* Formulario: pedir el email para el reset */}
+        {modo === 'olvide' && (
+          <form className={`space-y-4 ${modoAdultoMayor ? 'space-y-6' : ''}`} onSubmit={handleOlvideContrasena}>
+            <p className={`text-slate-400 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>Ingresá el email de tu cuenta y te mandamos un enlace para elegir una contraseña nueva.</p>
+            <div>
+              <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
+                Email <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="Ej: nombre@email.com"
+                className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={enviando}
+              className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition shadow-md flex items-center justify-center disabled:opacity-60 ${modoAdultoMayor ? 'py-4 text-lg min-h-[60px]' : 'py-3 text-sm min-h-[52px]'}`}
+            >
+              {enviando ? 'Enviando...' : 'Enviar enlace'}
+            </button>
+            <button
+              type="button"
+              onClick={() => cambiarModo('login')}
+              className={`w-full bg-transparent hover:bg-slate-800 text-slate-300 border border-slate-700 font-medium rounded-lg transition flex items-center justify-center ${modoAdultoMayor ? 'py-4 text-lg min-h-[60px]' : 'py-3 text-sm min-h-[52px]'}`}
+            >
+              &larr; Volver a iniciar sesión
+            </button>
+          </form>
+        )}
+
+        {/* Formulario: elegir la nueva contraseña (llegó acá con ?reset=TOKEN) */}
+        {modo === 'reset' && (
+          <form className={`space-y-4 ${modoAdultoMayor ? 'space-y-6' : ''}`} onSubmit={handleResetearContrasena}>
+            <div>
+              <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
+                Contraseña nueva <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                value={contrasena}
+                onChange={(e) => setContrasena(e.target.value)}
+                required
+                minLength={8}
+                placeholder="Mínimo 8 caracteres"
+                className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
+              />
+            </div>
+            <div>
+              <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
+                Confirmar contraseña <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                value={confirmarContrasena}
+                onChange={(e) => setConfirmarContrasena(e.target.value)}
+                required
+                minLength={8}
+                className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={enviando}
+              className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition shadow-md flex items-center justify-center disabled:opacity-60 ${modoAdultoMayor ? 'py-4 text-lg min-h-[60px]' : 'py-3 text-sm min-h-[52px]'}`}
+            >
+              {enviando ? 'Guardando...' : 'Guardar contraseña nueva'}
+            </button>
+          </form>
+        )}
+
+        {/* Formulario: login / registro */}
+        {(modo === 'login' || modo === 'registro') && (
         <form className={`space-y-4 ${modoAdultoMayor ? 'space-y-6' : ''}`} onSubmit={modo === 'login' ? handleLogin : handleRegistro}>
           {modo === 'registro' && (
             <>
@@ -213,7 +340,13 @@ function App() {
 
           {modo === 'login' && (
             <div className="flex items-center justify-end">
-              <a href="#" className={`text-blue-500 hover:underline ${modoAdultoMayor ? 'text-base' : 'text-xs'}`}>¿Olvidaste tu contraseña?</a>
+              <button
+                type="button"
+                onClick={() => cambiarModo('olvide')}
+                className={`text-blue-500 hover:underline ${modoAdultoMayor ? 'text-base' : 'text-xs'}`}
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
             </div>
           )}
 
@@ -233,6 +366,7 @@ function App() {
             {modo === 'login' ? 'Crear una cuenta' : 'Ya tengo una cuenta'}
           </button>
         </form>
+        )}
 
         {/* Toggle de Modo Adulto Mayor centrado y abajo en la tarjeta (según PDF) */}
         <div className="mt-6 pt-4 border-t border-slate-800 flex flex-col items-center justify-center space-y-2">

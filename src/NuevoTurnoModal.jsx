@@ -1,46 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from './api';
-
-const DIAS_A_MOSTRAR = 14;
-const HORA_INICIO = 8;
-const HORA_FIN = 20;
-const MINUTOS_ANTICIPACION = 60;
-
-// Próximos N días a partir de hoy, para los "chips" de fecha — el año nunca
-// se le pide al usuario, se infiere solo de la fecha real del sistema.
-function generarProximosDias(cantidad) {
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  return Array.from({ length: cantidad }, (_, i) => {
-    const dia = new Date(hoy);
-    dia.setDate(dia.getDate() + i);
-    return dia;
-  });
-}
-
-// Horarios dentro de la disponibilidad real del médico para el día elegido
-// (si todavía no cargó ninguna franja, usamos el rango 8-20hs de siempre
-// como respaldo — mismo criterio de compatibilidad que aplica el backend
-// en crearTurno). Filtra los que ya pasaron (con 1hs de margen) si el día
-// elegido es hoy.
-function generarHorariosDelDia(dia, disponibilidadMedico) {
-  if (!dia) return [];
-  const duracion = disponibilidadMedico?.duracionTurnoMinutos || 30;
-  const franjas = disponibilidadMedico?.disponibilidades?.length
-    ? disponibilidadMedico.disponibilidades.filter((f) => f.diaSemana === dia.getDay())
-    : [{ horaInicioMinutos: HORA_INICIO * 60, horaFinMinutos: HORA_FIN * 60 }];
-
-  const minimo = Date.now() + MINUTOS_ANTICIPACION * 60 * 1000;
-  const horarios = [];
-  for (const franja of franjas) {
-    for (let m = franja.horaInicioMinutos; m + duracion <= franja.horaFinMinutos; m += duracion) {
-      const slot = new Date(dia);
-      slot.setHours(0, m, 0, 0);
-      if (slot.getTime() >= minimo) horarios.push(slot);
-    }
-  }
-  return horarios.sort((a, b) => a - b);
-}
+import { DIAS_A_MOSTRAR, generarProximosDias, generarHorariosDelDia } from './turnoUtils';
 
 function NuevoTurnoModal({ onClose, onCreado }) {
   const [paso, setPaso] = useState(1);
@@ -160,6 +120,15 @@ function NuevoTurnoModal({ onClose, onCreado }) {
                     >
                       <p className="font-medium">{m.usuario?.nomYape}</p>
                       <p className="text-xs text-slate-400">{m.consultorio ? `Consultorio ${m.consultorio}` : 'Consultorio a confirmar'}</p>
+                      <p className="text-xs mt-1">
+                        {m.proximaDisponibilidad ? (
+                          <span className="text-emerald-400">
+                            Próximo lugar: {new Date(m.proximaDisponibilidad).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })} a las {new Date(m.proximaDisponibilidad).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">Sin franjas configuradas todavía</span>
+                        )}
+                      </p>
                     </button>
                   ))}
                 </div>

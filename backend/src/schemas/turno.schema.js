@@ -16,4 +16,13 @@ const actualizarEstadoTurnoSchema = z.object({
   }),
 });
 
-module.exports = { crearTurnoSchema, actualizarEstadoTurnoSchema };
+const reprogramarTurnoSchema = z.object({
+  fechaYhora: z
+    .string()
+    .datetime({ message: 'fechaYhora debe ser una fecha ISO válida' })
+    .refine((valor) => new Date(valor).getTime() > Date.now(), {
+      message: 'El turno debe ser en una fecha futura',
+    }),
+});
+
+module.exports = { crearTurnoSchema, actualizarEstadoTurnoSchema, reprogramarTurnoSchema };

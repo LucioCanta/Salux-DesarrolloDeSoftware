@@ -21,10 +21,30 @@ const crearMedicoSchema = z.object({
   especialidadesIds: z
     .array(z.number().int().positive())
     .min(1, 'Debe indicar al menos una especialidad'),
+  // Cuánto dura cada turno de este médico. Opcional: si no se manda, Prisma
+  // usa el default de 30 minutos.
+  duracionTurnoMinutos: z.preprocess(
+    (valor) => (valor === '' || valor == null ? undefined : Number(valor)),
+    z.number().int().min(5, 'La duración mínima es 5 minutos').max(240, 'La duración máxima es 240 minutos').optional()
+  ),
 });
 
 const cambiarEstadoMedicoSchema = z.object({
   activo: z.boolean(),
 });
 
-module.exports = { crearMedicoSchema, cambiarEstadoMedicoSchema };
+const actualizarMedicoSchema = z.object({
+  consultorio: z.preprocess(
+    (valor) => (valor === '' || valor == null ? undefined : valor),
+    z.string()
+      .trim()
+      .regex(/^[A-Za-z0-9]{1,10}$/, 'El consultorio debe ser un valor corto, ej: "A" o "204" (sin la palabra "Consultorio")')
+      .optional()
+  ),
+  duracionTurnoMinutos: z.preprocess(
+    (valor) => (valor === '' || valor == null ? undefined : Number(valor)),
+    z.number().int().min(5, 'La duración mínima es 5 minutos').max(240, 'La duración máxima es 240 minutos').optional()
+  ),
+});
+
+module.exports = { crearMedicoSchema, cambiarEstadoMedicoSchema, actualizarMedicoSchema };
