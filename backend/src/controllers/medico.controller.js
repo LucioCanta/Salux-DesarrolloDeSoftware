@@ -103,8 +103,68 @@ const obtenerMedicos = async (req, res) => {
   }
 };
 
+// Lista TODOS los médicos (activos e inactivos) con sus datos completos —
+// a diferencia de obtenerMedicos (que filtra solo activos, para el flujo de
+// reserva de turnos del paciente), esta es para la data table del panel de
+// administración, donde el admin necesita ver y poder reactivar inactivos.
+const obtenerTodosLosMedicos = async (req, res) => {
+  try {
+    const medicos = await prisma.medico.findMany({
+      orderBy: { idMedico: 'asc' },
+      include: {
+        usuario: {
+          select: { idUsuario: true, nomYape: true, email: true, dni: true, activo: true }
+        },
+        especialidades: true
+      }
+    });
+
+    res.json({
+      ok: true,
+      data: medicos
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+};
+
+// Activa/desactiva la cuenta del médico (reutiliza el flag Usuario.activo,
+// el mismo que ya usan login/verificarToken para bloquear el acceso).
+const cambiarEstadoMedico = async (req, res) => {
+  try {
+    const idMedico = parseInt(req.params.id, 10);
+    if (Number.isNaN(idMedico)) {
+      return res.status(400).json({ ok: false, message: 'id de médico inválido' });
+    }
+    const { activo } = req.body;
+
+    const medico = await prisma.medico.findUnique({ where: { idMedico }, select: { usuarioId: true } });
+    if (!medico) {
+      return res.status(404).json({ ok: false, message: 'Médico no encontrado' });
+    }
+
+    const usuario = await prisma.usuario.update({
+      where: { idUsuario: medico.usuarioId },
+      data: { activo },
+      select: { idUsuario: true, activo: true }
+    });
+
+    res.json({
+      ok: true,
+      message: `Médico ${activo ? 'activado' : 'desactivado'} con éxito`,
+      data: usuario
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+};
+
 // Acordate de actualizar la exportación para incluir la nueva función
 module.exports = {
   crearMedico,
-  obtenerMedicos
+  obtenerMedicos,
+  obtenerTodosLosMedicos,
+  cambiarEstadoMedico
 };

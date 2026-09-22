@@ -187,6 +187,38 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
     }
   };
 
+  // Data table de médicos (a diferencia de api.medicos(), esta trae también
+  // los inactivos para que el admin pueda reactivarlos)
+  const [tabAdmin, setTabAdmin] = useState('turnos');
+  const [medicosAdmin, setMedicosAdmin] = useState([]);
+  const [cargandoMedicosAdmin, setCargandoMedicosAdmin] = useState(() => esAdmin);
+  const [errorMedicosAdmin, setErrorMedicosAdmin] = useState('');
+
+  const cargarMedicosAdmin = () => {
+    api.todosLosMedicos()
+      .then(({ data }) => setMedicosAdmin(data))
+      .catch((err) => setErrorMedicosAdmin(err.message))
+      .finally(() => setCargandoMedicosAdmin(false));
+  };
+
+  useEffect(() => {
+    if (!esAdmin) return;
+    cargarMedicosAdmin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const toggleEstadoMedico = async (medico) => {
+    const nuevoEstado = !medico.usuario.activo;
+    try {
+      await api.cambiarEstadoMedico(medico.idMedico, nuevoEstado);
+      setMedicosAdmin(prev => prev.map(m =>
+        m.idMedico === medico.idMedico ? { ...m, usuario: { ...m.usuario, activo: nuevoEstado } } : m
+      ));
+    } catch (err) {
+      alert(`No se pudo cambiar el estado del médico: ${err.message}`);
+    }
+  };
+
   // ==========================================
   // Agenda del médico logueado
   // ==========================================
@@ -608,7 +640,9 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               }`} style={{ fontSize: modoAdultoMayor ? '13px' : '11px' }}>
                 Panel de Administración
               </span>
-              <h1 className="font-bold" style={{ fontSize: modoAdultoMayor ? '32px' : '24px' }}>Gestión de turnos</h1>
+              <h1 className="font-bold" style={{ fontSize: modoAdultoMayor ? '32px' : '24px' }}>
+                {tabAdmin === 'medicos' ? 'Gestión de médicos' : 'Gestión de turnos'}
+              </h1>
             </div>
             <div className="flex gap-2">
               <button
@@ -632,6 +666,26 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             </div>
           </div>
 
+          {/* Tabs: Turnos / Médicos */}
+          <div className="flex gap-2 border-b border-slate-700 pb-3">
+            {[{ id: 'turnos', label: 'Turnos' }, { id: 'medicos', label: 'Médicos' }].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setTabAdmin(tab.id)}
+                className={`px-4 py-2 rounded-lg font-medium transition ${
+                  tabAdmin === tab.id
+                    ? (altoContraste ? 'bg-black text-white' : 'bg-blue-600 text-white')
+                    : (altoContraste ? 'bg-white text-black border border-black' : 'bg-slate-800 text-slate-300 hover:bg-slate-700')
+                }`}
+                style={{ fontSize: modoAdultoMayor ? '16px' : '14px' }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {tabAdmin === 'turnos' && (
+          <>
           {/* Tarjetas de estadísticas en tiempo real */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
@@ -763,6 +817,74 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               );
             })}
           </div>
+          </>
+          )}
+
+          {tabAdmin === 'medicos' && (
+            <>
+              {errorMedicosAdmin && !cargandoMedicosAdmin && (
+                <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                  No se pudieron cargar los médicos: {errorMedicosAdmin}
+                </div>
+              )}
+
+              {cargandoMedicosAdmin && (
+                <div className="text-slate-400 text-sm py-4">Cargando médicos...</div>
+              )}
+
+              {!cargandoMedicosAdmin && !errorMedicosAdmin && medicosAdmin.length === 0 && (
+                <div className={`p-8 rounded-xl border text-center ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>
+                  Todavía no hay médicos cargados. Usá "+ Especialidad / Médico" para agregar el primero.
+                </div>
+              )}
+
+              {!cargandoMedicosAdmin && !errorMedicosAdmin && medicosAdmin.length > 0 && (
+                <div className={`overflow-x-auto rounded-xl border ${altoContraste ? 'bg-white border-black' : 'border-slate-700 bg-slate-800'}`}>
+                  <table className="w-full text-left" style={{ fontSize: modoAdultoMayor ? '16px' : '14px' }}>
+                    <thead>
+                      <tr className={`border-b ${altoContraste ? 'border-black' : 'border-slate-700'}`}>
+                        {['Médico', 'Email', 'DNI', 'Matrícula', 'Consultorio', 'Especialidades', 'Estado', ''].map((col) => (
+                          <th key={col} className={`px-4 py-3 font-semibold uppercase tracking-wider ${altoContraste ? 'text-black' : 'text-slate-400'}`} style={{ fontSize: modoAdultoMayor ? '13px' : '11px' }}>
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {medicosAdmin.map((medico) => (
+                        <tr key={medico.idMedico} className={`border-b last:border-0 ${altoContraste ? 'border-black' : 'border-slate-700'}`}>
+                          <td className="px-4 py-3 font-medium">{medico.usuario.nomYape}</td>
+                          <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.usuario.email}</td>
+                          <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.usuario.dni}</td>
+                          <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.matricula}</td>
+                          <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.consultorio || '—'}</td>
+                          <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>
+                            {medico.especialidades.map((e) => e.nombre).join(', ') || '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${medico.usuario.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                              {medico.usuario.activo ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => toggleEstadoMedico(medico)}
+                              className={`border px-3 py-1.5 rounded-lg text-sm font-semibold transition ${
+                                altoContraste ? 'border-black text-black hover:bg-slate-100' :
+                                medico.usuario.activo ? 'border-red-500 text-red-400 hover:bg-red-600/10' : 'border-emerald-500 text-emerald-400 hover:bg-emerald-600/10'
+                              }`}
+                            >
+                              {medico.usuario.activo ? 'Desactivar' : 'Activar'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
         </main>
       ) : vistaActual === 'agenda-medico' ? (
         // ==========================================
@@ -1146,7 +1268,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
       )}
 
       {mostrarModalAlta && (
-        <AdminAltaModal onClose={() => setMostrarModalAlta(false)} />
+        <AdminAltaModal onClose={() => { setMostrarModalAlta(false); cargarMedicosAdmin(); }} />
       )}
 
       {mostrarModalPerfil && (

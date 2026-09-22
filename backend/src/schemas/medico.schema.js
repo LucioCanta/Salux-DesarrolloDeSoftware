@@ -23,4 +23,8 @@ const crearMedicoSchema = z.object({
     .min(1, 'Debe indicar al menos una especialidad'),
 });
 
-module.exports = { crearMedicoSchema };
+const cambiarEstadoMedicoSchema = z.object({
+  activo: z.boolean(),
+});
+
+module.exports = { crearMedicoSchema, cambiarEstadoMedicoSchema };

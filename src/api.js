@@ -137,6 +137,9 @@ export const api = {
   agendaMedico: () => request('/turnos/agenda-medico'),
   especialidades: () => request('/especialidades'),
   medicos: () => request('/medicos'),
+  todosLosMedicos: () => request('/medicos/todos'),
+  cambiarEstadoMedico: (idMedico, activo) =>
+    request(`/medicos/${idMedico}/estado`, { method: 'PATCH', body: { activo } }),
   crearTurno: (medicoId, fechaYhora) =>
     request('/turnos', { method: 'POST', body: { medicoId, fechaYhora } }),
   crearEspecialidad: (nombre) =>
