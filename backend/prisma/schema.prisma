@@ -35,12 +35,34 @@ model Medico {
   idMedico    Int      @id @default(autoincrement())
   matricula   String   @unique
   consultorio String?
-  
+  // Cuánto dura un turno de este médico, en minutos. Reemplaza la constante
+  // fija que usaba el chequeo de solapamiento de turno.controller.js.
+  duracionTurnoMinutos Int @default(30)
+
   usuarioId   Int      @unique
   usuario     Usuario  @relation(fields: [usuarioId], references: [idUsuario])
-  
+
   turnos      Turno[]
-  especialidades Especialidad[] 
+  especialidades Especialidad[]
+  disponibilidades Disponibilidad[]
+}
+
+// Franjas horarias recurrentes semanales en las que un médico atiende
+// (ej: "Lunes de 08:00 a 12:00"). Un médico sin ninguna franja cargada se
+// interpreta como "sin restricción" (compatibilidad con médicos existentes
+// creados antes de que este módulo existiera) — ver crearTurno.
+model Disponibilidad {
+  idDisponibilidad  Int @id @default(autoincrement())
+  // 0 = domingo ... 6 = sábado, igual que Date.getDay() en JS
+  diaSemana         Int
+  // Minutos desde la medianoche (0-1439), para poder comparar sin lidiar con zonas horarias
+  horaInicioMinutos Int
+  horaFinMinutos    Int
+
+  medicoId          Int
+  medico            Medico @relation(fields: [medicoId], references: [idMedico])
+
+  @@unique([medicoId, diaSemana, horaInicioMinutos])
 }
 
 model Administrador {

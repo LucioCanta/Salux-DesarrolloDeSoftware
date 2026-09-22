@@ -18,21 +18,28 @@ function generarProximosDias(cantidad) {
   });
 }
 
-// Horarios de 30 en 30 minutos dentro del horario de atención, para un día
-// puntual — filtra los que ya pasaron (con un margen de 1 hora) si el día
+// Horarios dentro de la disponibilidad real del médico para el día elegido
+// (si todavía no cargó ninguna franja, usamos el rango 8-20hs de siempre
+// como respaldo — mismo criterio de compatibilidad que aplica el backend
+// en crearTurno). Filtra los que ya pasaron (con 1hs de margen) si el día
 // elegido es hoy.
-function generarHorarios(dia) {
+function generarHorariosDelDia(dia, disponibilidadMedico) {
   if (!dia) return [];
+  const duracion = disponibilidadMedico?.duracionTurnoMinutos || 30;
+  const franjas = disponibilidadMedico?.disponibilidades?.length
+    ? disponibilidadMedico.disponibilidades.filter((f) => f.diaSemana === dia.getDay())
+    : [{ horaInicioMinutos: HORA_INICIO * 60, horaFinMinutos: HORA_FIN * 60 }];
+
   const minimo = Date.now() + MINUTOS_ANTICIPACION * 60 * 1000;
   const horarios = [];
-  for (let h = HORA_INICIO; h < HORA_FIN; h++) {
-    for (const m of [0, 30]) {
+  for (const franja of franjas) {
+    for (let m = franja.horaInicioMinutos; m + duracion <= franja.horaFinMinutos; m += duracion) {
       const slot = new Date(dia);
-      slot.setHours(h, m, 0, 0);
+      slot.setHours(0, m, 0, 0);
       if (slot.getTime() >= minimo) horarios.push(slot);
     }
   }
-  return horarios;
+  return horarios.sort((a, b) => a - b);
 }
 
 function NuevoTurnoModal({ onClose, onCreado }) {
@@ -46,16 +53,30 @@ function NuevoTurnoModal({ onClose, onCreado }) {
   const [medicoId, setMedicoId] = useState(null);
   const [fechaSeleccionada, setFechaSeleccionada] = useState(null);
   const [horaSeleccionada, setHoraSeleccionada] = useState(null);
+  const [disponibilidadMedico, setDisponibilidadMedico] = useState(null);
 
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState('');
 
   const [proximosDias] = useState(() => generarProximosDias(DIAS_A_MOSTRAR));
-  const horariosDelDia = generarHorarios(fechaSeleccionada);
+  const horariosDelDia = generarHorariosDelDia(fechaSeleccionada, disponibilidadMedico);
 
   const elegirDia = (dia) => {
     setFechaSeleccionada(dia);
     setHoraSeleccionada(null);
+  };
+
+  // Al elegir médico, traemos su disponibilidad real para generar los
+  // horarios del paso 3 (en vez del rango fijo 8-20hs).
+  const elegirMedico = (idMedico) => {
+    setMedicoId(idMedico);
+    setPaso(3);
+    setFechaSeleccionada(null);
+    setHoraSeleccionada(null);
+    setDisponibilidadMedico(null);
+    api.disponibilidadDeMedico(idMedico)
+      .then(({ data }) => setDisponibilidadMedico(data))
+      .catch(() => setDisponibilidadMedico(null));
   };
 
   useEffect(() => {
@@ -134,7 +155,7 @@ function NuevoTurnoModal({ onClose, onCreado }) {
                   {medicosDeLaEspecialidad.map((m) => (
                     <button
                       key={m.idMedico}
-                      onClick={() => { setMedicoId(m.idMedico); setPaso(3); }}
+                      onClick={() => elegirMedico(m.idMedico)}
                       className="w-full px-4 py-3 rounded-lg border border-slate-700 bg-slate-800 hover:border-blue-500 text-left transition"
                     >
                       <p className="font-medium">{m.usuario?.nomYape}</p>

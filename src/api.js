@@ -140,6 +140,11 @@ export const api = {
   todosLosMedicos: () => request('/medicos/todos'),
   cambiarEstadoMedico: (idMedico, activo) =>
     request(`/medicos/${idMedico}/estado`, { method: 'PATCH', body: { activo } }),
+  misDisponibilidades: () => request('/disponibilidad/mias'),
+  crearDisponibilidad: (datos) => request('/disponibilidad', { method: 'POST', body: datos }),
+  eliminarDisponibilidad: (idDisponibilidad) =>
+    request(`/disponibilidad/${idDisponibilidad}`, { method: 'DELETE' }),
+  disponibilidadDeMedico: (idMedico) => request(`/disponibilidad/medico/${idMedico}`),
   crearTurno: (medicoId, fechaYhora) =>
     request('/turnos', { method: 'POST', body: { medicoId, fechaYhora } }),
   crearEspecialidad: (nombre) =>

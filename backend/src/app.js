@@ -13,6 +13,7 @@ const especialidadRoutes = require('./routes/especialidad.routes');
 const medicoRoutes = require('./routes/medico.routes');
 const turnoRoutes = require('./routes/turno.routes');
 const pacienteRoutes = require('./routes/paciente.routes');
+const disponibilidadRoutes = require('./routes/disponibilidad.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -64,6 +65,7 @@ app.use('/api/especialidades', especialidadRoutes);
 app.use('/api/medicos', medicoRoutes);
 app.use('/api/turnos', turnoRoutes);
 app.use('/api/pacientes', pacienteRoutes);
+app.use('/api/disponibilidad', disponibilidadRoutes);
 
 app.get('/api/health', async (req, res) => {
   try {

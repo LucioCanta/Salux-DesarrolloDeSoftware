@@ -1,10 +1,5 @@
 const prisma = require('../config/prisma');
 
-// Duración asumida de un turno. No hay un campo de duración en el modelo
-// todavía; hasta que se agregue, usamos este valor fijo para detectar
-// solapamientos en la agenda de un médico.
-const DURACION_TURNO_MINUTOS = 30;
-
 // 1. Crear un turno nuevo
 const crearTurno = async (req, res) => {
   try {
@@ -17,7 +12,7 @@ const crearTurno = async (req, res) => {
       prisma.paciente.findUnique({ where: { usuarioId: usuarioId } }),
       prisma.medico.findUnique({
         where: { idMedico: medicoId },
-        include: { usuario: { select: { activo: true } } }
+        include: { usuario: { select: { activo: true } }, disponibilidades: true }
       }),
     ]);
 
@@ -33,6 +28,24 @@ const crearTurno = async (req, res) => {
       return res.status(422).json({ ok: false, message: 'Ese médico no está disponible actualmente' });
     }
 
+    const duracionTurnoMinutos = medico.duracionTurnoMinutos;
+
+    // Si el médico ya cargó su disponibilidad semanal, el turno tiene que caer
+    // completo dentro de alguna franja. Un médico sin ninguna franja cargada
+    // todavía (no configuró el módulo) queda sin esta restricción, por
+    // compatibilidad con los que ya existían antes de este módulo.
+    if (medico.disponibilidades.length > 0) {
+      const diaSemana = inicio.getDay();
+      const minutosInicio = inicio.getHours() * 60 + inicio.getMinutes();
+      const minutosFin = minutosInicio + duracionTurnoMinutos;
+      const dentroDeDisponibilidad = medico.disponibilidades.some(
+        (f) => f.diaSemana === diaSemana && f.horaInicioMinutos <= minutosInicio && f.horaFinMinutos >= minutosFin
+      );
+      if (!dentroDeDisponibilidad) {
+        return res.status(422).json({ ok: false, message: 'Ese horario no está dentro de la disponibilidad del médico' });
+      }
+    }
+
     // El paciente no puede tener dos turnos en el mismo horario, aunque sea con médicos distintos
     const turnoPacienteMismaHora = await prisma.turno.findFirst({
       where: { pacienteId: paciente.idPaciente, fechaYhora: inicio, estado: { not: 'CANCELADO' } }
@@ -42,9 +55,9 @@ const crearTurno = async (req, res) => {
     }
 
     // El médico no puede tener dos turnos que se superpongan en el tiempo
-    // (una reserva "ocupa" DURACION_TURNO_MINUTOS a partir de su hora de inicio)
-    const ventanaInicio = new Date(inicio.getTime() - DURACION_TURNO_MINUTOS * 60 * 1000);
-    const ventanaFin = new Date(inicio.getTime() + DURACION_TURNO_MINUTOS * 60 * 1000);
+    // (una reserva "ocupa" duracionTurnoMinutos a partir de su hora de inicio)
+    const ventanaInicio = new Date(inicio.getTime() - duracionTurnoMinutos * 60 * 1000);
+    const ventanaFin = new Date(inicio.getTime() + duracionTurnoMinutos * 60 * 1000);
     const turnoSuperpuesto = await prisma.turno.findFirst({
       where: {
         medicoId: medico.idMedico,
@@ -55,7 +68,7 @@ const crearTurno = async (req, res) => {
     if (turnoSuperpuesto) {
       return res.status(409).json({
         ok: false,
-        message: `Ese médico ya tiene un turno dentro de los ${DURACION_TURNO_MINUTOS} minutos de ese horario`
+        message: `Ese médico ya tiene un turno dentro de los ${duracionTurnoMinutos} minutos de ese horario`
       });
     }
 

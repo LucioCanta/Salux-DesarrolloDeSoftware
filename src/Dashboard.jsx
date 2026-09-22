@@ -5,6 +5,17 @@ import AdminAltaModal from './AdminAltaModal';
 import PerfilModal from './PerfilModal';
 
 const ESTADO_TEXTO = { PENDIENTE: 'Pendiente', CONFIRMADO: 'Confirmado', CANCELADO: 'Cancelado', FINALIZADO: 'Finalizado' };
+const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+function horaAMinutos(hora) {
+  const [h, m] = hora.split(':').map(Number);
+  return h * 60 + m;
+}
+function minutosAHora(minutos) {
+  const h = Math.floor(minutos / 60).toString().padStart(2, '0');
+  const m = (minutos % 60).toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
 
 function formatearTurno(t) {
   const fecha = new Date(t.fechaYhora);
@@ -250,6 +261,56 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
     }
   };
 
+  // ==========================================
+  // Disponibilidad semanal del médico logueado
+  // ==========================================
+  const [disponibilidades, setDisponibilidades] = useState([]);
+  const [cargandoDisponibilidad, setCargandoDisponibilidad] = useState(() => esMedico);
+  const [errorDisponibilidad, setErrorDisponibilidad] = useState('');
+  const [nuevaDia, setNuevaDia] = useState('1');
+  const [nuevaHoraInicio, setNuevaHoraInicio] = useState('08:00');
+  const [nuevaHoraFin, setNuevaHoraFin] = useState('12:00');
+  const [guardandoDisponibilidad, setGuardandoDisponibilidad] = useState(false);
+  const [errorNuevaDisponibilidad, setErrorNuevaDisponibilidad] = useState('');
+
+  useEffect(() => {
+    if (!esMedico) return;
+    api.misDisponibilidades()
+      .then(({ data }) => setDisponibilidades(data))
+      .catch((err) => setErrorDisponibilidad(err.message))
+      .finally(() => setCargandoDisponibilidad(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const agregarDisponibilidad = async (e) => {
+    e.preventDefault();
+    setErrorNuevaDisponibilidad('');
+    setGuardandoDisponibilidad(true);
+    try {
+      const { data } = await api.crearDisponibilidad({
+        diaSemana: Number(nuevaDia),
+        horaInicioMinutos: horaAMinutos(nuevaHoraInicio),
+        horaFinMinutos: horaAMinutos(nuevaHoraFin),
+      });
+      setDisponibilidades((prev) =>
+        [...prev, data].sort((a, b) => a.diaSemana - b.diaSemana || a.horaInicioMinutos - b.horaInicioMinutos)
+      );
+    } catch (err) {
+      setErrorNuevaDisponibilidad(err.message);
+    } finally {
+      setGuardandoDisponibilidad(false);
+    }
+  };
+
+  const eliminarFranja = async (idDisponibilidad) => {
+    try {
+      await api.eliminarDisponibilidad(idDisponibilidad);
+      setDisponibilidades((prev) => prev.filter((f) => f.idDisponibilidad !== idDisponibilidad));
+    } catch (err) {
+      alert(`No se pudo eliminar la franja horaria: ${err.message}`);
+    }
+  };
+
   // Cierra el menú mobile con la tecla Escape (sección 4.2 del documento)
   useEffect(() => {
     const cerrarConEscape = (e) => {
@@ -340,6 +401,14 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   {turnosHoyMedico.length > 0 && (
                     <span className="bg-[#DC2626] text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">{turnosHoyMedico.length}</span>
                   )}
+                </button>
+              )}
+              {esMedico && (
+                <button
+                  onClick={() => setVistaActual('disponibilidad')}
+                  className={`px-3 py-1.5 rounded-lg transition ${vistaActual === 'disponibilidad' ? 'bg-[#2563EB]/10 text-[#2563EB] font-semibold' : 'hover:text-[#2563EB]'}`}
+                >
+                  Mi disponibilidad
                 </button>
               )}
             </nav>
@@ -539,6 +608,24 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               </button>
             )}
 
+            {esMedico && (
+              <button
+                onClick={() => irA('disponibilidad')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${
+                  vistaActual === 'disponibilidad'
+                    ? (altoContraste ? 'bg-black text-white' : 'bg-[#2563EB]/10 text-[#2563EB]')
+                    : (altoContraste ? 'hover:bg-slate-100' : 'hover:bg-slate-800/60')
+                }`}
+                style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
+              >
+                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <rect x="3" y="4" width="18" height="18" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01" />
+                </svg>
+                Mi disponibilidad
+              </button>
+            )}
+
             <div className={`border-t my-2 ${altoContraste ? 'border-black' : 'border-slate-700'}`} />
 
             {/* Accesos rápidos de accesibilidad (sección 4.4) */}
@@ -653,15 +740,6 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 style={{ fontSize: modoAdultoMayor ? '18px' : '14px', minHeight: modoAdultoMayor ? '60px' : 'auto' }}
               >
                 + Especialidad / Médico
-              </button>
-              <button
-                onClick={() => alert('Modal de agregar disponibilidad en desarrollo')}
-                className={`font-semibold px-4 py-2.5 rounded-xl border transition ${
-                  altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-slate-700 text-slate-300 hover:bg-slate-800'
-                }`}
-                style={{ fontSize: modoAdultoMayor ? '18px' : '14px', minHeight: modoAdultoMayor ? '60px' : 'auto' }}
-              >
-                + Agregar disponibilidad
               </button>
             </div>
           </div>
@@ -980,6 +1058,102 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               );
             })}
           </div>
+        </main>
+      ) : vistaActual === 'disponibilidad' ? (
+        // ==========================================
+        // VISTA: "Mi disponibilidad" (franjas horarias del médico)
+        // ==========================================
+        <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+          <div>
+            <h1 className="font-bold" style={{ fontSize: modoAdultoMayor ? '32px' : '24px' }}>Mi disponibilidad</h1>
+            <p className="text-slate-400 text-sm">Definí los días y horarios en los que atendés. Los pacientes solo van a poder reservar turnos dentro de estas franjas.</p>
+          </div>
+
+          <form onSubmit={agregarDisponibilidad} className={`p-5 rounded-xl border space-y-4 ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800'}`}>
+            {errorNuevaDisponibilidad && (
+              <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                {errorNuevaDisponibilidad}
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Día</label>
+                <select
+                  value={nuevaDia}
+                  onChange={(e) => setNuevaDia(e.target.value)}
+                  className={`w-full px-3 py-2.5 rounded-lg border ${altoContraste ? 'bg-white border-black text-black' : 'bg-slate-950 border-slate-700 text-slate-200'}`}
+                >
+                  {DIAS_SEMANA.map((dia, idx) => (
+                    <option key={dia} value={idx}>{dia}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Desde</label>
+                <input
+                  type="time"
+                  value={nuevaHoraInicio}
+                  onChange={(e) => setNuevaHoraInicio(e.target.value)}
+                  className={`w-full px-3 py-2.5 rounded-lg border ${altoContraste ? 'bg-white border-black text-black' : 'bg-slate-950 border-slate-700 text-slate-200'}`}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Hasta</label>
+                <input
+                  type="time"
+                  value={nuevaHoraFin}
+                  onChange={(e) => setNuevaHoraFin(e.target.value)}
+                  className={`w-full px-3 py-2.5 rounded-lg border ${altoContraste ? 'bg-white border-black text-black' : 'bg-slate-950 border-slate-700 text-slate-200'}`}
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  disabled={guardandoDisponibilidad}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition"
+                >
+                  {guardandoDisponibilidad ? 'Agregando...' : '+ Agregar franja'}
+                </button>
+              </div>
+            </div>
+          </form>
+
+          {cargandoDisponibilidad && (
+            <div className="text-slate-400 text-sm py-4">Cargando tu disponibilidad...</div>
+          )}
+
+          {errorDisponibilidad && !cargandoDisponibilidad && (
+            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+              No se pudo cargar tu disponibilidad: {errorDisponibilidad}
+            </div>
+          )}
+
+          {!cargandoDisponibilidad && !errorDisponibilidad && disponibilidades.length === 0 && (
+            <div className={`p-8 rounded-xl border text-center ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>
+              Todavía no cargaste ninguna franja horaria. Hasta que lo hagas, los pacientes van a poder reservar en cualquier horario de 08:00 a 20:00.
+            </div>
+          )}
+
+          {!cargandoDisponibilidad && disponibilidades.length > 0 && (
+            <div className="space-y-2">
+              {disponibilidades.map((f) => (
+                <div
+                  key={f.idDisponibilidad}
+                  className={`px-4 py-3 rounded-lg border flex items-center justify-between ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800'}`}
+                >
+                  <span className="font-medium">
+                    {DIAS_SEMANA[f.diaSemana]} — {minutosAHora(f.horaInicioMinutos)} a {minutosAHora(f.horaFinMinutos)}
+                  </span>
+                  <button
+                    onClick={() => eliminarFranja(f.idDisponibilidad)}
+                    className="text-red-400 hover:text-red-300 text-xs font-semibold"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </main>
       ) : vistaActual === 'mis-turnos' ? (
         <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
