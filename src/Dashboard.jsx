@@ -133,6 +133,9 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   });
 
   const turnosActivos = listaTurnos.filter(t => t.estado === 'Pendiente' || t.estado === 'Confirmado');
+  const historialTurnos = listaTurnos
+    .filter(t => t.estado === 'Finalizado' || t.estado === 'Cancelado')
+    .sort((a, b) => new Date(b.fechaISO) - new Date(a.fechaISO));
   const proximoTurno = turnosActivos
     .filter(t => new Date(t.fechaISO).getTime() > ahora)
     .sort((a, b) => new Date(a.fechaISO) - new Date(b.fechaISO))[0];
@@ -278,6 +281,14 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   {turnosActivos.length > 0 && (
                     <span className="bg-[#DC2626] text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">{turnosActivos.length}</span>
                   )}
+                </button>
+              )}
+              {esPaciente && (
+                <button
+                  onClick={() => setVistaActual('historial')}
+                  className={`px-3 py-1.5 rounded-lg transition ${vistaActual === 'historial' ? 'bg-[#2563EB]/10 text-[#2563EB] font-semibold' : 'hover:text-[#2563EB]'}`}
+                >
+                  Historial
                 </button>
               )}
               {esAdmin && (
@@ -435,6 +446,23 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 {turnosActivos.length > 0 && (
                   <span className="ml-auto bg-[#DC2626] text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">{turnosActivos.length}</span>
                 )}
+              </button>
+            )}
+
+            {esPaciente && (
+              <button
+                onClick={() => irA('historial')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${
+                  vistaActual === 'historial'
+                    ? (altoContraste ? 'bg-black text-white' : 'bg-[#2563EB]/10 text-[#2563EB]')
+                    : (altoContraste ? 'hover:bg-slate-100' : 'hover:bg-slate-800/60')
+                }`}
+                style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
+              >
+                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v6h6M3.5 13a8.5 8.5 0 108.5-8.5" />
+                </svg>
+                Historial
               </button>
             )}
 
@@ -944,6 +972,61 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             })}
           </div>
         </main>
+      ) : vistaActual === 'historial' ? (
+        // ==========================================
+        // VISTA: "Historial" (turnos finalizados y cancelados)
+        // ==========================================
+        <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+          <div>
+            <h1 className="font-bold" style={{ fontSize: modoAdultoMayor ? '32px' : '24px' }}>Historial</h1>
+            <p className="text-slate-400 text-sm">{historialTurnos.length} turno{historialTurnos.length === 1 ? '' : 's'} en tu historial</p>
+          </div>
+
+          {cargandoTurnos && (
+            <div className="text-slate-400 text-sm py-4">Cargando tu historial...</div>
+          )}
+
+          {errorTurnos && !cargandoTurnos && (
+            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+              No se pudo cargar tu historial: {errorTurnos}
+            </div>
+          )}
+
+          {!cargandoTurnos && !errorTurnos && historialTurnos.length === 0 && (
+            <div className={`p-8 rounded-xl border text-center ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>
+              Todavía no tenés turnos finalizados o cancelados.
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {historialTurnos.map((turno) => {
+              const colorBarra = turno.estado === 'Finalizado' ? 'border-l-blue-500' : 'border-l-red-500';
+              const badgeColor = turno.estado === 'Finalizado' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700';
+
+              return (
+                <div
+                  key={turno.id}
+                  className={`p-5 rounded-xl border-l-4 ${colorBarra} border shadow-md flex items-start gap-4 ${
+                    altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 text-[#F1F5F9]'
+                  }`}
+                >
+                  <div className="w-12 h-12 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center shrink-0">
+                    {turno.medico.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold uppercase tracking-wider text-blue-400">{turno.especialidad}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${badgeColor}`}>{turno.estado}</span>
+                    </div>
+                    <h3 className="font-bold text-lg">{turno.medico}</h3>
+                    <p className={`text-sm mt-1 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>📅 {turno.fecha} — <strong>{turno.hora}</strong></p>
+                    <p className={`text-xs mt-0.5 ${altoContraste ? 'text-black' : 'text-slate-400'}`}>📍 {turno.consultorio}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </main>
       ) : (
         // ==========================================
         // VISTA 2: "Dashboard Principal"
@@ -1022,10 +1105,10 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   <p className="text-slate-400" style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>Anulá turnos que no necesites</p>
                 </div>
 
-                <div onClick={() => alert('Módulo de historial médico')} className={`p-5 rounded-xl border shadow-sm cursor-pointer transition ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 hover:border-blue-500'}`}>
+                <div onClick={() => setVistaActual('historial')} className={`p-5 rounded-xl border shadow-sm cursor-pointer transition ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 hover:border-blue-500'}`}>
                   <div className="w-10 h-10 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold mb-3">📁</div>
                   <h4 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '20px' : '16px' }}>Historial</h4>
-                  <p className="text-slate-400" style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>Historial médico y citas pasadas</p>
+                  <p className="text-slate-400" style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>Turnos finalizados y cancelados</p>
                 </div>
               </div>
             </div>
