@@ -405,6 +405,15 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
     setMenuMobileAbierto(false);
   };
 
+  // "Alto contraste" y "Adulto mayor" son variantes visuales del mismo eje
+  // (qué tan marcado se ve todo), no dos ejes independientes — por eso van
+  // como un único selector de 3 opciones en vez de dos checkboxes sueltos
+  // que se podían activar juntos sin ninguna combinación clara.
+  const elegirTemaAccesibilidad = (tema) => {
+    setAltoContraste(tema === 'contraste');
+    setModoAdultoMayor(tema === 'mayor');
+  };
+
   return (
     <div
       style={{ fontSize: modoAdultoMayor ? '20px' : '16px' }}
@@ -519,17 +528,36 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                       <input type="checkbox" checked={modoOscuro} onChange={() => { setModoOscuro(!modoOscuro); if(altoContraste) setAltoContraste(false); }} />
                     </label>
                     <label className="flex items-center justify-between cursor-pointer">
-                      <span>Alto contraste</span>
-                      <input type="checkbox" checked={altoContraste} onChange={() => setAltoContraste(!altoContraste)} />
-                    </label>
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <span>Modo adulto mayor</span>
-                      <input type="checkbox" checked={modoAdultoMayor} onChange={() => setModoAdultoMayor(!modoAdultoMayor)} />
-                    </label>
-                    <label className="flex items-center justify-between cursor-pointer">
                       <span>Reducir animaciones</span>
                       <input type="checkbox" checked={reducirAnimaciones} onChange={() => setReducirAnimaciones(!reducirAnimaciones)} />
                     </label>
+                  </div>
+
+                  <p className="font-bold uppercase tracking-wider text-slate-400 mt-4 mb-2" style={{ fontSize: modoAdultoMayor ? '14px' : '12px' }}>Tema</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'normal', label: 'Normal' },
+                      { id: 'contraste', label: 'Alto contraste' },
+                      { id: 'mayor', label: 'Adulto mayor' },
+                    ].map((opcion) => {
+                      const activo = opcion.id === 'normal' ? (!altoContraste && !modoAdultoMayor) : opcion.id === 'contraste' ? altoContraste : modoAdultoMayor;
+                      return (
+                        <button
+                          key={opcion.id}
+                          type="button"
+                          onClick={() => elegirTemaAccesibilidad(opcion.id)}
+                          aria-pressed={activo}
+                          className={`px-2 py-2 rounded-lg border font-medium transition ${
+                            activo
+                              ? (altoContraste ? 'border-black bg-black text-white' : 'border-blue-500 bg-blue-500/10 text-blue-400')
+                              : (altoContraste ? 'border-black text-black' : 'border-slate-700 text-slate-300 hover:border-slate-500')
+                          }`}
+                          style={{ fontSize: modoAdultoMayor ? '13px' : '11px' }}
+                        >
+                          {opcion.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -726,7 +754,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 Oscuro
               </button>
               <button
-                onClick={() => setAltoContraste(!altoContraste)}
+                onClick={() => elegirTemaAccesibilidad(altoContraste ? 'normal' : 'contraste')}
                 aria-pressed={altoContraste}
                 className={`flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border font-medium transition ${
                   altoContraste
@@ -742,7 +770,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 Contraste
               </button>
               <button
-                onClick={() => setModoAdultoMayor(!modoAdultoMayor)}
+                onClick={() => elegirTemaAccesibilidad(modoAdultoMayor ? 'normal' : 'mayor')}
                 aria-pressed={modoAdultoMayor}
                 className={`flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border font-medium transition ${
                   modoAdultoMayor
