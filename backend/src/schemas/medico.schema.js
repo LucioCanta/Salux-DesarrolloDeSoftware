@@ -45,6 +45,12 @@ const actualizarMedicoSchema = z.object({
     (valor) => (valor === '' || valor == null ? undefined : Number(valor)),
     z.number().int().min(5, 'La duración mínima es 5 minutos').max(240, 'La duración máxima es 240 minutos').optional()
   ),
+  // Reemplaza la lista completa de especialidades del médico (no es un
+  // "agregar", es un set) — si se manda, tiene que quedar al menos una.
+  especialidadesIds: z
+    .array(z.number().int().positive())
+    .min(1, 'Debe indicar al menos una especialidad')
+    .optional(),
 });
 
 module.exports = { crearMedicoSchema, cambiarEstadoMedicoSchema, actualizarMedicoSchema };

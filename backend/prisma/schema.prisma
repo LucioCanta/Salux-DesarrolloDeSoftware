@@ -95,6 +95,7 @@ model Administrador {
 model Especialidad {
   idEspecialidad Int      @id @default(autoincrement())
   nombre         String   @unique
+  activo         Boolean  @default(true)
   medicos        Medico[]
 }
 

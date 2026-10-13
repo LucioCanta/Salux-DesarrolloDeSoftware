@@ -48,6 +48,7 @@ function FormEspecialidad() {
   const [cargandoLista, setCargandoLista] = useState(true);
   const [errorLista, setErrorLista] = useState('');
   const [eliminandoId, setEliminandoId] = useState(null);
+  const [espAConfirmar, setEspAConfirmar] = useState(null);
 
   const cargarEspecialidades = () => {
     api.especialidades()
@@ -77,17 +78,20 @@ function FormEspecialidad() {
     }
   };
 
-  const eliminar = async (esp) => {
-    if (!confirm(`¿Eliminar la especialidad "${esp.nombre}"?`)) return;
+  // Antes de eliminar mostramos quiénes se ven afectados (el admin confirma
+  // desde el modal, ver <ModalConfirmarEliminar /> más abajo).
+  const eliminar = (esp) => setEspAConfirmar(esp);
+
+  const confirmarEliminacion = async (esp) => {
     setError('');
     setExito('');
+    setEspAConfirmar(null);
     setEliminandoId(esp.idEspecialidad);
     try {
       await api.eliminarEspecialidad(esp.idEspecialidad);
       setEspecialidades((prev) => prev.filter((e) => e.idEspecialidad !== esp.idEspecialidad));
       setExito(`Especialidad "${esp.nombre}" eliminada.`);
     } catch (err) {
-      // Es esperable que esto falle con "hay médicos asignados" — se lo mostramos tal cual al admin
       setError(err.message);
     } finally {
       setEliminandoId(null);
@@ -130,6 +134,63 @@ function FormEspecialidad() {
             </li>
           ))}
         </ul>
+      </div>
+
+      {espAConfirmar && (
+        <ModalConfirmarEliminar
+          especialidad={espAConfirmar}
+          onCancelar={() => setEspAConfirmar(null)}
+          onConfirmar={() => confirmarEliminacion(espAConfirmar)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Cartel de confirmación que se muestra ARRIBA del modal de alta (z-index
+// mayor) al presionar "Eliminar" sobre una especialidad. Lista los médicos
+// que se van a ver afectados antes de que el admin confirme el borrado lógico.
+function ModalConfirmarEliminar({ especialidad, onCancelar, onConfirmar }) {
+  const medicos = especialidad.medicos || [];
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm text-slate-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-800">
+          <h3 className="font-bold text-lg">¿Eliminar "{especialidad.nombre}"?</h3>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          {medicos.length > 0 ? (
+            <>
+              <p className="text-sm text-amber-400">
+                {medicos.length} médico{medicos.length > 1 ? 's tienen' : ' tiene'} esta especialidad asignada. Van a seguir teniéndola en su perfil, pero la especialidad deja de estar disponible para nuevos turnos.
+              </p>
+              <ul className="space-y-1 max-h-32 overflow-y-auto text-sm text-slate-300 list-disc list-inside">
+                {medicos.map((m) => (
+                  <li key={m.idMedico}>{m.usuario?.nomYape}</li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="text-sm text-slate-400">No hay médicos asignados a esta especialidad.</p>
+          )}
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onCancelar}
+              className="flex-1 border border-slate-600 text-slate-300 hover:bg-slate-800 font-medium py-2.5 rounded-lg transition"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={onConfirmar}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 rounded-lg transition"
+            >
+              Eliminar
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
