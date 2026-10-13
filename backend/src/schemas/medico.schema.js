@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { contrasenaSegura, validarContrasenaConContexto } = require('../utils/politicaContrasena');
 
 const crearMedicoSchema = z.object({
   email: z.string().trim().toLowerCase().email('Email inválido'),
@@ -6,9 +7,9 @@ const crearMedicoSchema = z.object({
     .string()
     .trim()
     .regex(/^\d{7,9}$/, 'El DNI debe tener entre 7 y 9 dígitos'),
-  contrasena: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
-  nomYape: z.string().trim().min(1, 'El nombre es obligatorio'),
-  matricula: z.string().trim().min(1, 'La matrícula es obligatoria'),
+  contrasena: contrasenaSegura,
+  nomYape: z.string().trim().min(1, 'El nombre es obligatorio').max(191, 'El nombre es demasiado largo'),
+  matricula: z.string().trim().min(1, 'La matrícula es obligatoria').max(50, 'La matrícula es demasiado larga'),
   // Valor corto (ej: "A", "12", "204"): la palabra "Consultorio" la agrega
   // siempre la UI al mostrarlo, nunca se guarda como parte del dato.
   consultorio: z.preprocess(
@@ -27,7 +28,7 @@ const crearMedicoSchema = z.object({
     (valor) => (valor === '' || valor == null ? undefined : Number(valor)),
     z.number().int().min(5, 'La duración mínima es 5 minutos').max(240, 'La duración máxima es 240 minutos').optional()
   ),
-});
+}).superRefine(validarContrasenaConContexto);
 
 const cambiarEstadoMedicoSchema = z.object({
   activo: z.boolean(),

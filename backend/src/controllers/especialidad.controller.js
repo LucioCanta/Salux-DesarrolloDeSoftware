@@ -50,11 +50,13 @@ const crearEspecialidad = async (req, res) => {
 };
 const obtenerEspecialidades = async (req, res) => {
   try {
-    // Incluimos los médicos asignados (con su nombre) para que el admin
-    // pueda ver a quiénes afecta antes de confirmar un borrado lógico.
+    // Para el admin incluimos los médicos asignados (solo id y nombre) para que
+    // vea a quiénes afecta antes de confirmar un borrado lógico. Este endpoint
+    // lo consume cualquier usuario logueado: al resto no se le devuelve.
+    const esAdmin = !!(await prisma.administrador.findUnique({ where: { usuarioId: req.usuario.id } }));
     const especialidades = await prisma.especialidad.findMany({
       where: { activo: true },
-      include: { medicos: { include: { usuario: { select: { nomYape: true } } } } }
+      ...(esAdmin ? { include: { medicos: { select: { idMedico: true, usuario: { select: { nomYape: true } } } } } } : {})
     });
     
     res.json({ 

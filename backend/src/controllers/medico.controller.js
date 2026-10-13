@@ -95,6 +95,8 @@ const crearMedico = async (req, res) => {
         dni,
         contrasena: hashedPassword,
         nomYape,
+        // La contraseña la eligió el admin: el médico tiene que cambiarla al ingresar
+        debeCambiarContrasena: true,
         medico: {
           create: {
             matricula,
@@ -149,11 +151,11 @@ const obtenerMedicos = async (req, res) => {
       where: { usuario: { activo: true } },
       include: {
         // Traemos los datos del usuario, pero seleccionamos qué campos mostrar por seguridad
+        // Este listado lo ve cualquier usuario logueado (incluidos pacientes):
+        // solo el nombre, nada de email ni ids internos de cuenta.
         usuario: {
           select: {
-            idUsuario: true,
             nomYape: true,
-            email: true,
             activo: true
           }
         },
@@ -167,7 +169,17 @@ const obtenerMedicos = async (req, res) => {
     // Se calcula por médico (consulta propia de turnos existentes cada uno),
     // así que van todas en paralelo en vez de una por una.
     const medicosConDisponibilidad = await Promise.all(
-      medicos.map(async (m) => ({ ...m, proximaDisponibilidad: await calcularProximaDisponibilidad(m) }))
+      medicos.map(async (m) => {
+        // usuarioId y matrícula son datos internos/administrativos; los motivos
+        // de las ausencias, privados del médico (se usan solo para el cálculo).
+        // eslint-disable-next-line no-unused-vars
+        const { usuarioId, matricula, ausencias, ...publico } = m;
+        return {
+          ...publico,
+          ausencias: ausencias.map((a) => ({ fechaInicio: a.fechaInicio, fechaFin: a.fechaFin })),
+          proximaDisponibilidad: await calcularProximaDisponibilidad(m),
+        };
+      })
     );
 
     res.json({

@@ -22,10 +22,23 @@ async function vencerTurnosPendientes() {
   }
 }
 
+// Las sesiones (inicios de sesión) vencidas ya no sirven: se borran para que la tabla no crezca.
+async function purgarSesionesVencidas() {
+  try {
+    await prisma.sesion.deleteMany({ where: { expiraEn: { lt: new Date() } } });
+  } catch (error) {
+    console.error('[sesiones] No se pudieron purgar las sesiones vencidas:', error.message);
+  }
+}
+
 function iniciarVencimientoDeTurnos() {
-  vencerTurnosPendientes();
+  const tarea = () => {
+    vencerTurnosPendientes();
+    purgarSesionesVencidas();
+  };
+  tarea();
   // unref: el temporizador no impide que el proceso termine al apagar el servidor
-  setInterval(vencerTurnosPendientes, CADA_MINUTOS * 60 * 1000).unref();
+  setInterval(tarea, CADA_MINUTOS * 60 * 1000).unref();
 }
 
 module.exports = { vencerTurnosPendientes, iniciarVencimientoDeTurnos };

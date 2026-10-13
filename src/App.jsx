@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Dashboard from './Dashboard';
+import CambioContrasenaObligatorio from './CambioContrasenaObligatorio';
 import { api, getUsuarioGuardado, guardarSesion, borrarSesion, actualizarUsuarioGuardado, getPreferenciasAccesibilidad, guardarPreferenciasAccesibilidad } from './api';
 
 function App() {
@@ -15,7 +16,11 @@ function App() {
   // Si el link del mail de "recuperar contraseña" trae ?reset=TOKEN, arrancamos
   // directo en esa pantalla en vez del login.
   const [resetToken] = useState(() => new URLSearchParams(window.location.search).get('reset'));
-  const [modo, setModo] = useState(() => (resetToken ? 'reset' : 'login')); // 'login' | 'registro' | 'olvide' | 'reset'
+  // Si el link del mail de "activar cuenta" trae ?verificar=TOKEN, mostramos el resultado.
+  const [verificarToken] = useState(() => new URLSearchParams(window.location.search).get('verificar'));
+  const verificacionIniciada = useRef(false);
+  const [requiereVerificacion, setRequiereVerificacion] = useState(false);
+  const [modo, setModo] = useState(() => (resetToken ? 'reset' : verificarToken ? 'verificar' : 'login')); // 'login' | 'registro' | 'olvide' | 'reset' | 'verificar'
   const [email, setEmail] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [confirmarContrasena, setConfirmarContrasena] = useState('');
@@ -41,6 +46,24 @@ function App() {
       .finally(() => setVerificandoSesion(false));
   }, []);
 
+  // Saber si el servidor exige verificar el email (muestra la opción de reenviar el enlace).
+  useEffect(() => {
+    api.configPublica()
+      .then(({ data }) => setRequiereVerificacion(!!data.requiereVerificacionEmail))
+      .catch(() => {});
+  }, []);
+
+  // Confirma el email al llegar desde el enlace del correo. El token es de un
+  // solo uso: en desarrollo React ejecuta los efectos dos veces, de ahí el ref.
+  useEffect(() => {
+    if (!verificarToken || verificacionIniciada.current) return;
+    verificacionIniciada.current = true;
+    api.verificarEmail(verificarToken)
+      .then(({ message }) => setMensaje(message))
+      .catch((err) => setError(err.message))
+      .finally(() => window.history.replaceState({}, '', window.location.pathname));
+  }, [verificarToken]);
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
@@ -56,12 +79,34 @@ function App() {
     }
   };
 
+  const reenviarVerificacion = async () => {
+    setError('');
+    setMensaje('');
+    if (!email.trim()) {
+      setError('Escribí tu email arriba y volvé a tocar "Reenviar".');
+      return;
+    }
+    try {
+      const { message } = await api.reenviarVerificacion(email);
+      setMensaje(message);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const handleRegistro = async (e) => {
     e.preventDefault();
     setError('');
     setEnviando(true);
     try {
-      await api.register({ email, dni, contrasena, nomYape });
+      const respuesta = await api.register({ email, dni, contrasena, nomYape });
+      if (respuesta.requiereVerificacion) {
+        // El servidor exige confirmar el email: no hay sesión todavía.
+        setMensaje(respuesta.message);
+        setContrasena('');
+        setModo('login');
+        return;
+      }
       const { token, usuario: usuarioLogueado } = await api.login(email, contrasena);
       guardarSesion(token, usuarioLogueado);
       setUsuario(usuarioLogueado);
@@ -146,6 +191,10 @@ function App() {
     actualizarUsuarioGuardado(usuarioActualizado);
   };
 
+  if (usuario?.debeCambiarContrasena) {
+    return <CambioContrasenaObligatorio usuario={usuario} onCambiada={handleUsuarioActualizado} onLogout={handleLogout} />;
+  }
+
   if (usuario) {
     return <Dashboard usuario={usuario} onLogout={handleLogout} onUsuarioActualizado={handleUsuarioActualizado} />;
   }
@@ -170,7 +219,7 @@ function App() {
         <div className="text-center mb-6">
           <h1 className={`font-bold tracking-tight text-white ${modoAdultoMayor ? 'text-4xl' : 'text-2xl'}`}>Salux</h1>
           <p className={`text-slate-400 mt-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
-            {modo === 'olvide' ? 'Recuperar contraseña' : modo === 'reset' ? 'Elegí tu nueva contraseña' : 'Sistema de Gestión de Turnos Médicos'}
+            {modo === 'olvide' ? 'Recuperar contraseña' : modo === 'reset' ? 'Elegí tu nueva contraseña' : modo === 'verificar' ? 'Verificación de email' : 'Sistema de Gestión de Turnos Médicos'}
           </p>
         </div>
 
@@ -219,6 +268,17 @@ function App() {
           </form>
         )}
 
+        {/* Resultado de la verificación de email (llegó acá con ?verificar=TOKEN) */}
+        {modo === 'verificar' && (
+          <button
+            type="button"
+            onClick={() => cambiarModo('login')}
+            className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition shadow-md flex items-center justify-center ${modoAdultoMayor ? 'py-4 text-lg min-h-[60px]' : 'py-3 text-sm min-h-[52px]'}`}
+          >
+            Ir a iniciar sesión
+          </button>
+        )}
+
         {/* Formulario: elegir la nueva contraseña (llegó acá con ?reset=TOKEN) */}
         {modo === 'reset' && (
           <form className={`space-y-4 ${modoAdultoMayor ? 'space-y-6' : ''}`} onSubmit={handleResetearContrasena}>
@@ -231,10 +291,11 @@ function App() {
                 value={contrasena}
                 onChange={(e) => setContrasena(e.target.value)}
                 required
-                minLength={8}
-                placeholder="Mínimo 8 caracteres"
+                minLength={10}
+                placeholder="Mínimo 10 caracteres"
                 className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
               />
+              <p className="text-slate-500 text-xs mt-1">Con letras y números; sin contraseñas comunes ni tus datos.</p>
             </div>
             <div>
               <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
@@ -245,7 +306,7 @@ function App() {
                 value={confirmarContrasena}
                 onChange={(e) => setConfirmarContrasena(e.target.value)}
                 required
-                minLength={8}
+                minLength={10}
                 className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
               />
             </div>
@@ -327,8 +388,8 @@ function App() {
                 value={contrasena}
                 onChange={(e) => setContrasena(e.target.value)}
                 required
-                minLength={modo === 'registro' ? 8 : undefined}
-                placeholder={modo === 'login' ? 'Ingresá tu contraseña' : 'Mínimo 8 caracteres'}
+                minLength={modo === 'registro' ? 10 : undefined}
+                placeholder={modo === 'login' ? 'Ingresá tu contraseña' : 'Mínimo 10 caracteres'}
                 className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 pr-10 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
               />
               {/* Botón del ícono de visibilidad (ojo) */}
@@ -347,6 +408,16 @@ function App() {
               </button>
             </div>
           </div>
+
+          {modo === 'login' && requiereVerificacion && (
+            <button
+              type="button"
+              onClick={reenviarVerificacion}
+              className={`text-blue-500 hover:underline text-left ${modoAdultoMayor ? 'text-base' : 'text-xs'}`}
+            >
+              ¿No te llegó el email para activar tu cuenta? Reenviar enlace
+            </button>
+          )}
 
           {modo === 'login' && (
             <div className="flex items-center justify-end">
