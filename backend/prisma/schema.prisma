@@ -14,6 +14,21 @@ model Usuario {
   contrasena  String
   nomYape     String
   activo      Boolean        @default(true)
+  // Se incrementa al cambiar/resetear la contraseña: los tokens emitidos antes
+  // (access y refresh) llevan la versión vieja y dejan de valer.
+  tokenVersion Int           @default(0)
+
+  // El admin crea los médicos con una contraseña inicial: hasta que la cambien
+  // en su primer ingreso, la API solo les deja usar el cambio de contraseña.
+  debeCambiarContrasena Boolean @default(false)
+
+  // Verificación de email al registrarse (si REQUIERE_VERIFICACION_EMAIL=true).
+  // Los usuarios que ya existían quedan verificados. El token se guarda hasheado.
+  emailVerificado    Boolean   @default(true)
+  verificacionToken  String?   @unique
+  verificacionExpira DateTime?
+
+  sesiones Sesion[]
 
   // Recuperación de contraseña: token de un solo uso + vencimiento. Ambos
   // quedan en null mientras no haya un pedido de reset pendiente.
@@ -23,6 +38,20 @@ model Usuario {
   paciente    Paciente?
   medico      Medico?
   admin       Administrador?
+}
+
+// Una fila por inicio de sesión (dispositivo/navegador). El refresh token y el
+// access token llevan su id: borrar la fila cierra esa sesión de verdad, y
+// al cambiar la contraseña se borran todas.
+model Sesion {
+  idSesion  Int      @id @default(autoincrement())
+  usuarioId Int
+  usuario   Usuario  @relation(fields: [usuarioId], references: [idUsuario], onDelete: Cascade)
+  creadaEn  DateTime @default(now())
+  expiraEn  DateTime
+
+  @@index([usuarioId])
+  @@index([expiraEn])
 }
 
 model Paciente {

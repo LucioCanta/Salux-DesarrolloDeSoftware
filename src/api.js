@@ -83,7 +83,10 @@ function armarError(data) {
   const detalleCampos = Array.isArray(data?.errores)
     ? data.errores.map((e) => `${e.campo}: ${e.mensaje}`).join(' — ')
     : null;
-  return new Error(detalleCampos || data?.message || data?.error || 'Error de conexión con el servidor');
+  const error = new Error(detalleCampos || data?.message || data?.error || 'Error de conexión con el servidor');
+  // Código de negocio opcional (ej: CAMBIO_CONTRASENA_REQUERIDO) para que la UI reaccione
+  error.codigo = data?.codigo;
+  return error;
 }
 
 // Pide un Access Token nuevo usando el Refresh Token de la cookie httpOnly
@@ -152,12 +155,27 @@ export const api = {
   register: (datos) =>
     request('/auth/register', { method: 'POST', body: datos, auth: false }),
   refrescarSesion,
+  configPublica: () => request('/config', { auth: false }),
   logout: () => request('/auth/logout', { method: 'POST', auth: false }),
+  logoutTodas: async () => {
+    await request('/auth/logout-todas', { method: 'POST' });
+    borrarSesion();
+  },
+  verificarEmail: (token) =>
+    request('/auth/verificar-email', { method: 'POST', body: { token }, auth: false }),
+  reenviarVerificacion: (email) =>
+    request('/auth/reenviar-verificacion', { method: 'POST', body: { email }, auth: false }),
   perfil: () => request('/auth/perfil'),
   actualizarPerfil: (nomYape) => request('/auth/perfil', { method: 'PATCH', body: { nomYape } }),
   actualizarPerfilPaciente: (datos) => request('/pacientes/perfil', { method: 'PATCH', body: datos }),
-  cambiarContrasena: (contrasenaActual, contrasenaNueva) =>
-    request('/auth/perfil/contrasena', { method: 'PATCH', body: { contrasenaActual, contrasenaNueva } }),
+  // El servidor cierra las demás sesiones al cambiar la contraseña y devuelve
+  // un Access Token nuevo para esta: hay que adoptarlo o el próximo request
+  // se rechazaría.
+  cambiarContrasena: async (contrasenaActual, contrasenaNueva) => {
+    const data = await request('/auth/perfil/contrasena', { method: 'PATCH', body: { contrasenaActual, contrasenaNueva } });
+    if (data?.token) accessToken = data.token;
+    return data;
+  },
   misTurnos: () => request('/turnos/mis-turnos'),
   cancelarTurno: (idTurno) =>
     request(`/turnos/${idTurno}`, { method: 'PATCH', body: { estado: 'CANCELADO' } }),
