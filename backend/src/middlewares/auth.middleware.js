@@ -9,7 +9,9 @@ const verificarToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1]; 
 
   if (!token) {
-    return res.status(403).json({ ok: false, message: 'Acceso denegado: Se requiere un token' });
+    // 401 (no autenticado), no 403: así el frontend lo trata igual que un
+    // token vencido e intenta renovar la sesión en vez de mostrar el error.
+    return res.status(401).json({ ok: false, message: 'Acceso denegado: Se requiere un token' });
   }
 
   // 2. Verificamos que el token sea auténtico y no haya expirado

@@ -21,6 +21,15 @@ function EditarMedicoModal({ medico, onClose, onActualizado }) {
       .finally(() => setCargandoEsp(false));
   }, []);
 
+  // Además de las activas, mostramos las que el médico ya tiene pero fueron
+  // dadas de baja, para que el admin pueda verlas y quitarlas.
+  const opciones = [
+    ...especialidades,
+    ...(medico.especialidades || [])
+      .filter((e) => !e.activo && !especialidades.some((a) => a.idEspecialidad === e.idEspecialidad))
+      .map((e) => ({ ...e, inactiva: true })),
+  ];
+
   const toggleEspecialidad = (id) => {
     setEspecialidadesIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
@@ -74,14 +83,15 @@ function EditarMedicoModal({ medico, onClose, onActualizado }) {
             <label className={labelClase}>Especialidades</label>
             {cargandoEsp ? (
               <p className="text-slate-400 text-sm">Cargando especialidades...</p>
-            ) : especialidades.length === 0 ? (
+            ) : opciones.length === 0 ? (
               <p className="text-slate-400 text-sm">No hay especialidades activas cargadas.</p>
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                {especialidades.map((esp) => (
+                {opciones.map((esp) => (
                   <label key={esp.idEspecialidad} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 text-sm cursor-pointer">
                     <input type="checkbox" checked={especialidadesIds.includes(esp.idEspecialidad)} onChange={() => toggleEspecialidad(esp.idEspecialidad)} />
-                    {esp.nombre}
+                    <span className={esp.inactiva ? 'text-slate-500 line-through' : ''}>{esp.nombre}</span>
+                    {esp.inactiva && <span className="text-[10px] text-amber-400">inactiva</span>}
                   </label>
                 ))}
               </div>

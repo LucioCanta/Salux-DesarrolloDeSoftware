@@ -12,8 +12,22 @@ const crearEspecialidad = async (req, res) => {
       where: { nombre: { equals: nombre } }
     });
 
-    if (existente) {
+    if (existente && existente.activo) {
       return res.status(409).json({ ok: false, message: 'Ya existe una especialidad con ese nombre' });
+    }
+
+    // Estaba eliminada (borrado lógico): "crearla" de nuevo la reactiva, así
+    // conserva a los médicos que ya la tenían asignada.
+    if (existente) {
+      const reactivada = await prisma.especialidad.update({
+        where: { idEspecialidad: existente.idEspecialidad },
+        data: { activo: true }
+      });
+      return res.status(201).json({
+        ok: true,
+        message: 'Especialidad reactivada con éxito',
+        data: reactivada
+      });
     }
 
     const nuevaEspecialidad = await prisma.especialidad.create({

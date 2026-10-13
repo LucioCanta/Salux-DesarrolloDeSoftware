@@ -11,7 +11,15 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email('Email inválido'),
+  // Email o DNI (7 a 9 dígitos): el login acepta cualquiera de los dos.
+  identificador: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine(
+      (v) => /^\d{7,9}$/.test(v) || z.string().email().safeParse(v).success,
+      'Ingresá un email o un DNI válido'
+    ),
   contrasena: z.string().min(1, 'La contraseña es obligatoria'),
 });
 

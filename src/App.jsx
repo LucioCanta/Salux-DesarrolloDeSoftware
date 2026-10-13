@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Dashboard from './Dashboard';
-import { api, getUsuarioGuardado, guardarSesion, borrarSesion, actualizarUsuarioGuardado } from './api';
+import { api, getUsuarioGuardado, guardarSesion, borrarSesion, actualizarUsuarioGuardado, getPreferenciasAccesibilidad, guardarPreferenciasAccesibilidad } from './api';
 
 function App() {
   const [usuario, setUsuario] = useState(() => getUsuarioGuardado());
@@ -10,7 +10,7 @@ function App() {
   // el refresh token (cookie httpOnly); si no hay nada cacheado, esperamos
   // el resultado antes de mostrar cualquier pantalla.
   const [verificandoSesion, setVerificandoSesion] = useState(() => !getUsuarioGuardado());
-  const [modoAdultoMayor, setModoAdultoMayor] = useState(false);
+  const [modoAdultoMayor, setModoAdultoMayor] = useState(() => getPreferenciasAccesibilidad().modoAdultoMayor ?? false);
   const [mostrarPassword, setMostrarPassword] = useState(false);
   // Si el link del mail de "recuperar contraseña" trae ?reset=TOKEN, arrancamos
   // directo en esa pantalla en vez del login.
@@ -256,6 +256,16 @@ function App() {
             >
               {enviando ? 'Guardando...' : 'Guardar contraseña nueva'}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                window.history.replaceState({}, '', window.location.pathname);
+                cambiarModo('login');
+              }}
+              className={`w-full bg-transparent hover:bg-slate-800 text-slate-300 border border-slate-700 font-medium rounded-lg transition flex items-center justify-center ${modoAdultoMayor ? 'py-4 text-lg min-h-[60px]' : 'py-3 text-sm min-h-[52px]'}`}
+            >
+              &larr; Volver a iniciar sesión
+            </button>
           </form>
         )}
 
@@ -375,7 +385,10 @@ function App() {
           </span>
           <button
             type="button"
-            onClick={() => setModoAdultoMayor(!modoAdultoMayor)}
+            onClick={() => {
+              guardarPreferenciasAccesibilidad({ modoAdultoMayor: !modoAdultoMayor });
+              setModoAdultoMayor(!modoAdultoMayor);
+            }}
             className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors duration-300 ${modoAdultoMayor ? 'bg-blue-600' : 'bg-slate-700'}`}
           >
             <div className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform duration-300 ${modoAdultoMayor ? 'translate-x-6' : 'translate-x-0'}`} />
