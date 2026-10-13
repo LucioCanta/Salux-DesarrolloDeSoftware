@@ -26,7 +26,7 @@ function formatearTurno(t) {
   return {
     id: t.idTurno,
     medicoId: t.medico?.idMedico,
-    especialidad: t.medico?.especialidades?.[0]?.nombre || 'Consulta general',
+    especialidad: t.especialidad?.nombre || t.medico?.especialidades?.[0]?.nombre || 'Consulta general',
     medico: t.medico?.usuario?.nomYape || 'Médico',
     consultorio: t.medico?.consultorio ? `Consultorio ${t.medico.consultorio}` : 'Consultorio a confirmar',
     fecha: fechaTexto.charAt(0).toUpperCase() + fechaTexto.slice(1),
@@ -44,7 +44,7 @@ function formatearTurnoAdmin(t) {
   return {
     id: t.idTurno,
     paciente: t.paciente?.usuario?.nomYape || 'Paciente',
-    especialidad: t.medico?.especialidades?.[0]?.nombre || 'Consulta general',
+    especialidad: t.especialidad?.nombre || t.medico?.especialidades?.[0]?.nombre || 'Consulta general',
     medico: t.medico?.usuario?.nomYape || 'Médico',
     fecha: fechaTexto,
     hora: horaTexto,
@@ -116,7 +116,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   const [mostrarModalAlta, setMostrarModalAlta] = useState(false);
   const [mostrarModalPerfil, setMostrarModalPerfil] = useState(false);
   const [mostrarConfirmarSalir, setMostrarConfirmarSalir] = useState(false);
-  const [turnoAConfirmarCancelacion, setTurnoAConfirmarCancelacion] = useState(null);
+  // { descripcion, ejecutar }: qué turno se va a cancelar y la acción a correr al confirmar
+  const [confirmacionCancelacion, setConfirmacionCancelacion] = useState(null);
 
   const cargarMisTurnos = () => {
     api.misTurnos()
@@ -999,7 +1000,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                       Confirmar
                     </button>
                     <button
-                      onClick={() => actualizarEstadoTurnoAdmin(turno.id, 'Cancelado')}
+                      onClick={() => setConfirmacionCancelacion({ descripcion: `${turno.paciente} con ${turno.medico} — ${turno.fecha}, ${turno.hora}`, ejecutar: () => actualizarEstadoTurnoAdmin(turno.id, 'Cancelado') })}
                       disabled={esTerminal}
                       className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-red-500 text-red-400 hover:bg-red-600/10'
@@ -1034,7 +1035,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               )}
 
               {!cargandoMedicosAdmin && !errorMedicosAdmin && medicosAdmin.length > 0 && (
-                <div className={`overflow-x-auto rounded-xl border ${altoContraste ? 'bg-white border-black' : 'border-slate-700 bg-slate-800'}`}>
+                <>
+                <div className={`hidden md:block overflow-x-auto rounded-xl border ${altoContraste ? 'bg-white border-black' : 'border-slate-700 bg-slate-800'}`}>
                   <table className="w-full text-left" style={{ fontSize: modoAdultoMayor ? '16px' : '14px' }}>
                     <thead>
                       <tr className={`border-b ${altoContraste ? 'border-black' : 'border-slate-700'}`}>
@@ -1086,6 +1088,47 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                     </tbody>
                   </table>
                 </div>
+
+                {/* En pantallas chicas la tabla no entra: una tarjeta por médico */}
+                <div className="md:hidden space-y-3">
+                  {medicosAdmin.map((medico) => (
+                    <div key={medico.idMedico} className={`p-4 rounded-xl border space-y-2 ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800'}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-bold">{medico.usuario.nomYape}</h3>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${medico.usuario.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          {medico.usuario.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </div>
+                      <p className={`text-sm break-all ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.usuario.email}</p>
+                      <p className={`text-xs ${altoContraste ? 'text-black' : 'text-slate-400'}`}>
+                        DNI {medico.usuario.dni} · Mat. {medico.matricula} · Cons. {medico.consultorio || '—'} · {medico.duracionTurnoMinutos} min
+                      </p>
+                      <p className={`text-xs ${altoContraste ? 'text-black' : 'text-slate-400'}`}>
+                        {medico.especialidades.map((e) => (e.activo ? e.nombre : `${e.nombre} (inactiva)`)).join(', ') || 'Sin especialidades'}
+                      </p>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => setMedicoEditando(medico)}
+                          className={`flex-1 border px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                            altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => toggleEstadoMedico(medico)}
+                          className={`flex-1 border px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                            altoContraste ? 'border-black text-black hover:bg-slate-100' :
+                            medico.usuario.activo ? 'border-red-500 text-red-400 hover:bg-red-600/10' : 'border-emerald-500 text-emerald-400 hover:bg-emerald-600/10'
+                          }`}
+                        >
+                          {medico.usuario.activo ? 'Desactivar' : 'Activar'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                </>
               )}
             </>
           )}
@@ -1177,7 +1220,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                       Finalizar
                     </button>
                     <button
-                      onClick={() => actualizarEstadoAgenda(turno.id, 'Cancelado')}
+                      onClick={() => setConfirmacionCancelacion({ descripcion: `${turno.paciente} — ${turno.fecha}, ${turno.hora}`, ejecutar: () => actualizarEstadoAgenda(turno.id, 'Cancelado') })}
                       disabled={finalizado}
                       className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-red-500 text-red-400 hover:bg-red-600/10'
@@ -1490,7 +1533,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                       Reprogramar
                     </button>
                     <button
-                      onClick={() => setTurnoAConfirmarCancelacion(turno)}
+                      onClick={() => setConfirmacionCancelacion({ descripcion: `${turno.medico} — ${turno.fecha}, ${turno.hora}`, ejecutar: () => cancelarTurno(turno.id) })}
                       disabled={noCancelable}
                       className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-red-500 text-red-400 hover:bg-red-600/10'
@@ -1705,23 +1748,23 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
         />
       )}
 
-      {turnoAConfirmarCancelacion && (
+      {confirmacionCancelacion && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm text-slate-100 p-6 space-y-4">
             <h2 className="font-bold text-lg">¿Cancelar este turno?</h2>
             <p className="text-slate-400 text-sm">
-              {turnoAConfirmarCancelacion.medico} — {turnoAConfirmarCancelacion.fecha}, {turnoAConfirmarCancelacion.hora}.
+              {confirmacionCancelacion.descripcion}.
               Esta acción no se puede deshacer; si cambiás de idea tendrías que reservar un turno nuevo.
             </p>
             <div className="flex justify-end gap-3 pt-2">
               <button
-                onClick={() => setTurnoAConfirmarCancelacion(null)}
+                onClick={() => setConfirmacionCancelacion(null)}
                 className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 font-medium transition"
               >
                 Volver
               </button>
               <button
-                onClick={() => { cancelarTurno(turnoAConfirmarCancelacion.id); setTurnoAConfirmarCancelacion(null); }}
+                onClick={() => { confirmacionCancelacion.ejecutar(); setConfirmacionCancelacion(null); }}
                 className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition"
               >
                 Sí, cancelar turno

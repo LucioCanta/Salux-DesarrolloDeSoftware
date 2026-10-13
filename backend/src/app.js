@@ -14,6 +14,7 @@ const medicoRoutes = require('./routes/medico.routes');
 const turnoRoutes = require('./routes/turno.routes');
 const pacienteRoutes = require('./routes/paciente.routes');
 const disponibilidadRoutes = require('./routes/disponibilidad.routes');
+const { iniciarVencimientoDeTurnos } = require('./jobs/vencerTurnosPendientes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,15 +50,26 @@ app.use(
 // Cada ruta necesita su PROPIA instancia: express-rate-limit cuenta por IP,
 // así que reutilizar una sola instancia para dos rutas distintas hace que
 // compartan el mismo cupo de intentos en vez de tener uno independiente cada una.
-const crearLimiterAuth = () =>
+const crearLimiterAuth = (opciones = {}) =>
   rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
     standardHeaders: true,
     legacyHeaders: false,
     message: { ok: false, message: 'Demasiados intentos. Probá de nuevo más tarde.' },
+    ...opciones,
   });
-app.use('/api/auth/login', crearLimiterAuth());
+
+// Login: solo cuentan los intentos FALLIDOS (entrar bien no gasta cupo) y hay
+// dos límites a la vez: uno por IP + cuenta (frena la fuerza bruta sobre un
+// usuario sin bloquear al resto de una red compartida, como una facultad) y
+// uno más amplio por IP (frena a quien prueba muchas cuentas distintas).
+const limiterLoginPorCuenta = crearLimiterAuth({
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => `${req.ip}|${String(req.body?.identificador || '').trim().toLowerCase()}`,
+});
+const limiterLoginPorIp = crearLimiterAuth({ skipSuccessfulRequests: true, max: 50 });
+app.use('/api/auth/login', limiterLoginPorIp, limiterLoginPorCuenta);
 app.use('/api/auth/register', crearLimiterAuth());
 app.use('/api/auth/olvide-contrasena', crearLimiterAuth());
 
@@ -93,6 +105,7 @@ app.use((err, req, res, next) => {
 
 const server = app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT} [${NODE_ENV}]`);
+  iniciarVencimientoDeTurnos();
 });
 
 const apagarConGracia = (signal) => {
