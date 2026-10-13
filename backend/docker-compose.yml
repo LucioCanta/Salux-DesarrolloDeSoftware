@@ -1,27 +1,27 @@
 services:
-  mysql-db:
-    image: mysql:8.0
+  postgres-db:
+    image: postgres:16-alpine
     container_name: salux_db_container
     restart: always
     environment:
-      # Lee MYSQL_ROOT_PASSWORD desde tu archivo .env local.
-      # Nunca hardcodees la contraseña aquí.
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: salux_db
-      # En una instalación nueva la imagen crea este usuario con permisos solo
-      # sobre MYSQL_DATABASE. (En una base ya creada hay que crearlo a mano: ver README.)
-      MYSQL_USER: ${MYSQL_APP_USER}
-      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD}
+      # Superusuario: solo para administrar el servidor (la app NO lo usa).
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: salux_db
+      # Los lee el script docker/postgres-init/01-crear-rol-app.sh, que en una
+      # instalación nueva crea el rol de la app (dueño de salux_db y nada más).
+      DB_APP_USER: ${DB_APP_USER}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
     ports:
       # Solo accesible desde esta máquina (Prisma Studio, un cliente SQL):
-      # publicar 3306 en 0.0.0.0 deja la base abierta a toda la red.
-      - "127.0.0.1:3306:3306"
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+      # publicar 5432 en 0.0.0.0 deja la base abierta a toda la red.
+      - "127.0.0.1:5432:5432"
     volumes:
-      - mysql_data:/var/lib/mysql
-    # Healthcheck para que el backend no arranque antes de que MySQL esté listo
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    # Healthcheck para que el backend no arranque antes de que la base esté lista
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d salux_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -50,12 +50,13 @@ services:
       - .env
     environment:
       # Dentro de la red de docker-compose, la DB se resuelve por el nombre del servicio, no "localhost".
-      DATABASE_URL: mysql://${MYSQL_APP_USER}:${MYSQL_APP_PASSWORD}@mysql-db:3306/salux_db
+      DATABASE_URL: postgresql://${DB_APP_USER}:${DB_APP_PASSWORD}@postgres-db:5432/salux_db
+      DIRECT_URL: postgresql://${DB_APP_USER}:${DB_APP_PASSWORD}@postgres-db:5432/salux_db
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     ports:
       - "${PORT:-3000}:3000"
     depends_on:
-      mysql-db:
+      postgres-db:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -66,4 +67,4 @@ services:
     command: sh -c "node node_modules/prisma/build/index.js migrate deploy && node src/app.js"
 
 volumes:
-  mysql_data:
+  postgres_data:

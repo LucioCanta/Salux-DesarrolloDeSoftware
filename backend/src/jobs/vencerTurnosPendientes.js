@@ -31,14 +31,33 @@ async function purgarSesionesVencidas() {
   }
 }
 
+// Contadores de límites de intentos ya vencidos (solo existen con RATE_LIMIT_STORE=db).
+async function purgarContadoresVencidos() {
+  try {
+    const { count } = await prisma.rateLimitContador.deleteMany({ where: { expiraEn: { lt: new Date() } } });
+    return count;
+  } catch (error) {
+    console.error('[ratelimit] No se pudieron purgar los contadores vencidos:', error.message);
+    return 0;
+  }
+}
+
+// Todo el mantenimiento periódico junto. Lo llama el temporizador (Docker/servidor
+// propio) o la ruta /api/cron/mantenimiento (Vercel Cron).
+async function ejecutarMantenimiento() {
+  const turnosVencidos = await vencerTurnosPendientes();
+  await purgarSesionesVencidas();
+  const contadores = await purgarContadoresVencidos();
+  return { turnosVencidos, contadoresPurgados: contadores };
+}
+
 function iniciarVencimientoDeTurnos() {
   const tarea = () => {
-    vencerTurnosPendientes();
-    purgarSesionesVencidas();
+    ejecutarMantenimiento();
   };
   tarea();
   // unref: el temporizador no impide que el proceso termine al apagar el servidor
   setInterval(tarea, CADA_MINUTOS * 60 * 1000).unref();
 }
 
-module.exports = { vencerTurnosPendientes, iniciarVencimientoDeTurnos };
+module.exports = { vencerTurnosPendientes, ejecutarMantenimiento, iniciarVencimientoDeTurnos };

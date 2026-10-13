@@ -1,4 +1,7 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+// En producción el frontend y la API viven bajo el mismo dominio (Vercel): la
+// ruta relativa evita CORS y deja que la cookie de sesión (SameSite=strict)
+// viaje. En desarrollo la API corre aparte, en el puerto 3000.
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3000/api');
 
 const USUARIO_KEY = 'salux_usuario';
 

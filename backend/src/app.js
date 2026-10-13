@@ -16,6 +16,7 @@ const medicoRoutes = require('./routes/medico.routes');
 const turnoRoutes = require('./routes/turno.routes');
 const pacienteRoutes = require('./routes/paciente.routes');
 const disponibilidadRoutes = require('./routes/disponibilidad.routes');
+const cronRoutes = require('./routes/cron.routes');
 const { iniciarVencimientoDeTurnos } = require('./jobs/vencerTurnosPendientes');
 
 const app = express();
@@ -104,6 +105,7 @@ app.use('/api/medicos', medicoRoutes);
 app.use('/api/turnos', turnoRoutes);
 app.use('/api/pacientes', pacienteRoutes);
 app.use('/api/disponibilidad', disponibilidadRoutes);
+app.use('/api/cron', cronRoutes);
 
 // Configuración pública que necesita la interfaz (sin datos sensibles).
 app.get('/api/config', (req, res) => {

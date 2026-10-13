@@ -1,11 +1,11 @@
 # Salux Backend
 
-API REST del sistema de gestión de turnos médicos Salux, construida con Express, Prisma y MySQL.
+API REST del sistema de gestión de turnos médicos Salux, construida con Express, Prisma y PostgreSQL.
 
 ## Requisitos
 
 - Node.js 18 o superior
-- MySQL 8 (local, en Docker, o gestionado en la nube)
+- PostgreSQL 14+ (local en Docker o gestionado: Supabase, Neon, etc.)
 - Docker + Docker Compose (opcional, para levantar todo con un comando)
 
 ## Configuración
@@ -50,38 +50,47 @@ El servidor levanta en `http://localhost:3000` (o el puerto definido en `PORT`).
 
 ## Con Docker Compose
 
-Levanta la base de datos MySQL y el backend juntos, aplicando migraciones automáticamente:
+Levanta la base de datos PostgreSQL y el backend juntos, aplicando migraciones automáticamente:
 
 ```bash
 docker compose up --build
 ```
 
-Levanta tres servicios: MySQL, Redis (contadores de los límites de intentos, sin puerto publicado) y el backend.
+Levanta tres servicios: PostgreSQL, Redis (contadores de los límites de intentos, sin puerto publicado) y el backend.
 
-### Usuario de base de datos de la app
+### Rol de base de datos de la app
 
-La app no se conecta como `root`: usa `salux_app`, con permisos solo sobre `salux_db`. En una instalación nueva, la imagen de MySQL lo crea sola a partir de `MYSQL_APP_USER` / `MYSQL_APP_PASSWORD`. Si ya tenés una base creada (el volumen ya existe), crealo una vez a mano:
+La app no se conecta con el superusuario `postgres`: usa el rol `salux_app`, dueño de `salux_db` y nada más. En una instalación nueva, `docker-compose` lo crea solo (script `docker/postgres-init/01-crear-rol-app.sh`) a partir de `DB_APP_USER` / `DB_APP_PASSWORD`. Si ya tenés un volumen de datos creado, el script no vuelve a correr; creá el rol a mano una vez:
 
 ```bash
-docker exec -it salux_db_container mysql -uroot -p
+docker exec -it salux_db_container psql -U postgres -d salux_db
 ```
 ```sql
-CREATE USER 'salux_app'@'%' IDENTIFIED BY 'LA_CONTRASEÑA_DE_MYSQL_APP_PASSWORD';
-GRANT ALL PRIVILEGES ON `salux_db`.* TO 'salux_app'@'%';
--- solo si usás `prisma migrate dev` desde tu máquina (crea una base temporal):
-GRANT ALL PRIVILEGES ON `prisma\_migrate\_shadow\_db\_%`.* TO 'salux_app'@'%';
-FLUSH PRIVILEGES;
+CREATE ROLE salux_app LOGIN PASSWORD 'LA_CONTRASEÑA_DE_DB_APP_PASSWORD' NOSUPERUSER NOCREATEROLE CREATEDB;
+ALTER DATABASE salux_db OWNER TO salux_app;
+```
+
+### Datos de demostración
+
+La base arranca vacía. Para cargar el administrador y datos de prueba:
+
+```bash
+node crearAdmin.js   # administrador (ADMIN_* del .env)
+node seedDemo.js     # especialidades + médico y paciente de prueba (PRUEBA_* del .env)
 ```
 
 ## Variables de entorno
 
 | Variable | Descripción |
 |---|---|
-| `DATABASE_URL` | Cadena de conexión MySQL para Prisma. Tiene que usar el usuario de la app (`salux_app`), nunca `root` |
-| `MYSQL_ROOT_PASSWORD` | Password root de MySQL (solo para administrar el servidor y el healthcheck) |
-| `MYSQL_APP_USER` / `MYSQL_APP_PASSWORD` | Usuario de la app, con permisos solo sobre `salux_db` |
+| `DATABASE_URL` | Cadena de conexión PostgreSQL de la app. Tiene que usar el rol `salux_app`, nunca el superusuario |
+| `DIRECT_URL` | Conexión para migraciones de Prisma (en local, igual que `DATABASE_URL`) |
+| `POSTGRES_PASSWORD` | Password del superusuario `postgres` (solo para administrar el servidor y el healthcheck) |
+| `DB_APP_USER` / `DB_APP_PASSWORD` | Rol de la app, dueño de `salux_db` y nada más |
 | `REDIS_PASSWORD` | Password del Redis de docker-compose (límites de intentos compartidos) |
-| `REDIS_URL` | Opcional fuera de Docker. Sin él los límites de intentos quedan en memoria |
+| `REDIS_URL` | Opcional fuera de Docker. Sin él (y sin `RATE_LIMIT_STORE=db`) los límites de intentos quedan en memoria |
+| `RATE_LIMIT_STORE` | `db` guarda los contadores de límites en la base (necesario en Vercel) |
+| `CRON_SECRET` | Habilita `/api/cron/mantenimiento` (tarea periódica en Vercel) |
 | `JWT_SECRET` / `JWT_REFRESH_SECRET` | Secretos para firmar tokens JWT (mínimo 32 caracteres, distintos entre sí) |
 | `PORT` | Puerto donde escucha el servidor (default `3000`) |
 | `NODE_ENV` | `development` o `production` |
@@ -120,7 +129,9 @@ FLUSH PRIVILEGES;
 
 ## Despliegue en producción
 
-1. Configurá las variables de entorno en la plataforma elegida (Render, Railway, Fly.io, etc.), incluyendo `DATABASE_URL` apuntando a tu MySQL gestionado y `CORS_ORIGIN` con el dominio real del frontend.
+> Para publicar en **Vercel + Supabase** seguí la guía paso a paso: [`DEPLOY.md`](../DEPLOY.md). Lo de abajo es el resumen genérico para otro hosting.
+
+1. Configurá las variables de entorno en la plataforma elegida (Render, Railway, Fly.io, etc.), incluyendo `DATABASE_URL` apuntando a tu PostgreSQL gestionado y `CORS_ORIGIN` con el dominio real del frontend.
 2. Comando de build: `npm install` (ejecuta `prisma generate` automáticamente).
 3. Antes de arrancar, corré las migraciones: `npm run db:migrate`.
 4. Comando de arranque: `npm start`.
