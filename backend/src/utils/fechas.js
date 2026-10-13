@@ -30,4 +30,16 @@ function diaSemanaYMinutosArgentina(fecha) {
   };
 }
 
-module.exports = { diaCalendarioUTC, diaSemanaYMinutosArgentina, OFFSET_ARGENTINA_MINUTOS };
+// Fecha y hora legibles (para los emails) vistas desde Argentina. Hay que
+// fijar la zona explícitamente: sin `timeZone`, toLocale*String usa la del
+// proceso (UTC en Docker) y un turno de las 10:00 sale como "01:00 p. m.".
+function formatearFechaHora(fecha) {
+  const f = new Date(fecha);
+  const zona = { timeZone: 'America/Argentina/Buenos_Aires' };
+  return {
+    fechaTexto: f.toLocaleDateString('es-AR', { ...zona, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+    horaTexto: f.toLocaleTimeString('es-AR', { ...zona, hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
+module.exports = { diaCalendarioUTC, diaSemanaYMinutosArgentina, formatearFechaHora, OFFSET_ARGENTINA_MINUTOS };

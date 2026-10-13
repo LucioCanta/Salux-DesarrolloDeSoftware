@@ -175,8 +175,8 @@ export const api = {
   eliminarDisponibilidad: (idDisponibilidad) =>
     request(`/disponibilidad/${idDisponibilidad}`, { method: 'DELETE' }),
   disponibilidadDeMedico: (idMedico) => request(`/disponibilidad/medico/${idMedico}`),
-  crearTurno: (medicoId, fechaYhora) =>
-    request('/turnos', { method: 'POST', body: { medicoId, fechaYhora } }),
+  crearTurno: (medicoId, fechaYhora, especialidadId) =>
+    request('/turnos', { method: 'POST', body: { medicoId, fechaYhora, especialidadId } }),
   crearEspecialidad: (nombre) =>
     request('/especialidades', { method: 'POST', body: { nombre } }),
   eliminarEspecialidad: (idEspecialidad) =>
