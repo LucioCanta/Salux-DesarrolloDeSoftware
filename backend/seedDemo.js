@@ -11,7 +11,19 @@
  * NO usar en una base de producción con datos reales.
  */
 
-require('dotenv').config({ override: true });
+require('dotenv').config();
+// Variables que ya vengan de la terminal (por ejemplo DATABASE_URL de Supabase)
+// tienen prioridad sobre el .env, así un script se puede apuntar a otra base
+// sin tocar el archivo. Siempre muestra a cuál se conecta.
+function mostrarBaseDeDatos() {
+  try {
+    const { host, pathname } = new URL(process.env.DATABASE_URL);
+    console.log(`🗄️  Base de datos: ${host}${pathname}`);
+  } catch {
+    console.log('🗄️  Base de datos: (DATABASE_URL inválida o ausente)');
+  }
+}
+
 const bcrypt = require('bcryptjs');
 const prisma = require('./src/config/prisma');
 const { problemasDeContrasena } = require('./src/utils/politicaContrasena');
@@ -37,6 +49,7 @@ async function crearUsuarioSiNoExiste({ email, dni, nomYape, contrasena, perfil 
 }
 
 async function main() {
+  mostrarBaseDeDatos();
   console.log('🌱 Cargando datos de demo...');
 
   for (const nombre of ESPECIALIDADES) {

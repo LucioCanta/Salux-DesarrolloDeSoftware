@@ -10,10 +10,23 @@
  * correr quien administra el servidor. No es un endpoint de la API.
  */
 
-require('dotenv').config({ override: true });
+require('dotenv').config();
+// Variables que ya vengan de la terminal (por ejemplo DATABASE_URL de Supabase)
+// tienen prioridad sobre el .env, así un script se puede apuntar a otra base
+// sin tocar el archivo. Siempre muestra a cuál se conecta.
+function mostrarBaseDeDatos() {
+  try {
+    const { host, pathname } = new URL(process.env.DATABASE_URL);
+    console.log(`🗄️  Base de datos: ${host}${pathname}`);
+  } catch {
+    console.log('🗄️  Base de datos: (DATABASE_URL inválida o ausente)');
+  }
+}
+
 const prisma = require('./src/config/prisma');
 
 async function main() {
+  mostrarBaseDeDatos();
   const email = (process.argv[2] || '').trim().toLowerCase();
   if (!email) {
     console.error('Uso: node verificarEmailManual.js correo@ejemplo.com');

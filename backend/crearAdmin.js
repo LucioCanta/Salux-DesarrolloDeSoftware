@@ -10,7 +10,19 @@
  * NUNCA hardcodees credenciales aquí.
  */
 
-require('dotenv').config({ override: true });
+require('dotenv').config();
+// Variables que ya vengan de la terminal (por ejemplo DATABASE_URL de Supabase)
+// tienen prioridad sobre el .env, así un script se puede apuntar a otra base
+// sin tocar el archivo. Siempre muestra a cuál se conecta.
+function mostrarBaseDeDatos() {
+  try {
+    const { host, pathname } = new URL(process.env.DATABASE_URL);
+    console.log(`🗄️  Base de datos: ${host}${pathname}`);
+  } catch {
+    console.log('🗄️  Base de datos: (DATABASE_URL inválida o ausente)');
+  }
+}
+
 const bcrypt = require('bcryptjs');
 const prisma = require('./src/config/prisma');
 const { problemasDeContrasena } = require('./src/utils/politicaContrasena');
@@ -40,6 +52,7 @@ function validarVariablesDeEntorno() {
 }
 
 async function main() {
+  mostrarBaseDeDatos();
   validarVariablesDeEntorno();
 
   const { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NOMBRE, ADMIN_DNI } = process.env;

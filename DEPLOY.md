@@ -35,16 +35,28 @@ Vercel Cron ──► /api/cron/mantenimiento (1 vez por día)
 
 ## 2. Crear las tablas y el administrador
 
-Desde tu máquina, en la carpeta `backend/`, con las dos variables de arriba (podés ponerlas temporalmente en `backend/.env`, **sin commitearlas**, o exportarlas en la terminal):
+Desde tu máquina, en la carpeta `backend/`, definí las dos variables **solo en esa terminal** (no editás tu `.env`, así tu base local sigue intacta). Las variables de la terminal tienen prioridad sobre el `.env`, y cada script imprime a qué base se está conectando: **confirmá que dice `…pooler.supabase.com` antes de seguir**.
 
-```bash
+PowerShell:
+```powershell
+cd backend
+$env:DATABASE_URL = "postgresql://salux_app.REF:CLAVE@aws-0-REGION.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+$env:DIRECT_URL   = "postgresql://salux_app.REF:CLAVE@aws-0-REGION.pooler.supabase.com:5432/postgres"
 npx prisma migrate deploy     # crea las tablas, índices y la seguridad (RLS)
-node crearAdmin.js            # crea el administrador (usa ADMIN_EMAIL / ADMIN_PASSWORD del .env)
+node crearAdmin.js            # crea el administrador (ADMIN_EMAIL / ADMIN_PASSWORD de tu .env)
+```
+
+Git Bash:
+```bash
+cd backend
+export DATABASE_URL="postgresql://salux_app.REF:CLAVE@aws-0-REGION.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+export DIRECT_URL="postgresql://salux_app.REF:CLAVE@aws-0-REGION.pooler.supabase.com:5432/postgres"
+npx prisma migrate deploy && node crearAdmin.js
 ```
 
 Para tener médicos y pacientes de demostración (opcional, **no** con datos reales): `node seedDemo.js`.
 
-Para volver a tu base local, restaurá `DATABASE_URL` / `DIRECT_URL` de tu `.env` a las de Docker.
+Al cerrar la terminal las variables desaparecen (no queda nada guardado).
 
 > Después de migrar, en Supabase → **Table Editor** vas a ver las tablas con el aviso "RLS enabled": es correcto y es lo que impide que la API pública de Supabase lea tus datos.
 
