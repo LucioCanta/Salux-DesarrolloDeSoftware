@@ -5,15 +5,28 @@ const crearEspecialidad = async (req, res) => {
     const { nombre } = req.body;
 
     // Comparación case-insensitive: "Cardiología" y "cardiología" son la misma
-    // especialidad para el negocio, aunque MySQL con collation *_ci ya las
-    // trataría como iguales a nivel de índice único; lo dejamos explícito acá
-    // para dar un mensaje claro sin depender de la collation de la columna.
+    // especialidad para el negocio. PostgreSQL distingue mayúsculas, así que se
+    // pide explícito (hay además un índice único sobre lower(nombre)).
     const existente = await prisma.especialidad.findFirst({
-      where: { nombre: { equals: nombre } }
+      where: { nombre: { equals: nombre, mode: 'insensitive' } }
     });
 
-    if (existente) {
+    if (existente && existente.activo) {
       return res.status(409).json({ ok: false, message: 'Ya existe una especialidad con ese nombre' });
+    }
+
+    // Estaba eliminada (borrado lógico): "crearla" de nuevo la reactiva, así
+    // conserva a los médicos que ya la tenían asignada.
+    if (existente) {
+      const reactivada = await prisma.especialidad.update({
+        where: { idEspecialidad: existente.idEspecialidad },
+        data: { activo: true }
+      });
+      return res.status(201).json({
+        ok: true,
+        message: 'Especialidad reactivada con éxito',
+        data: reactivada
+      });
     }
 
     const nuevaEspecialidad = await prisma.especialidad.create({
@@ -36,8 +49,14 @@ const crearEspecialidad = async (req, res) => {
 };
 const obtenerEspecialidades = async (req, res) => {
   try {
-    // Prisma busca todos los registros de la tabla
-    const especialidades = await prisma.especialidad.findMany();
+    // Para el admin incluimos los médicos asignados (solo id y nombre) para que
+    // vea a quiénes afecta antes de confirmar un borrado lógico. Este endpoint
+    // lo consume cualquier usuario logueado: al resto no se le devuelve.
+    const esAdmin = !!(await prisma.administrador.findUnique({ where: { usuarioId: req.usuario.id } }));
+    const especialidades = await prisma.especialidad.findMany({
+      where: { activo: true },
+      ...(esAdmin ? { include: { medicos: { select: { idMedico: true, usuario: { select: { nomYape: true } } } } } } : {})
+    });
     
     res.json({ 
       ok: true, 
@@ -56,25 +75,19 @@ const eliminarEspecialidad = async (req, res) => {
       return res.status(400).json({ ok: false, message: 'id de especialidad inválido' });
     }
 
-    const especialidad = await prisma.especialidad.findUnique({
-      where: { idEspecialidad },
-      include: { medicos: { select: { idMedico: true } } }
-    });
+    const especialidad = await prisma.especialidad.findUnique({ where: { idEspecialidad } });
 
-    if (!especialidad) {
+    if (!especialidad || !especialidad.activo) {
       return res.status(404).json({ ok: false, message: 'Especialidad no encontrada' });
     }
 
-    // Integridad referencial: no permitimos dejar médicos "huérfanos" de
-    // especialidad. El admin tiene que desvincular a los médicos primero.
-    if (especialidad.medicos.length > 0) {
-      return res.status(409).json({
-        ok: false,
-        message: `No se puede eliminar: hay ${especialidad.medicos.length} médico(s) con esta especialidad asignada`
-      });
-    }
-
-    await prisma.especialidad.delete({ where: { idEspecialidad } });
+    // Borrado lógico: no es un delete físico, así que no hace falta
+    // desvincular médicos primero. La relación muchos-a-muchos queda intacta
+    // (el médico sigue teniendo la especialidad en su lista), simplemente
+    // deja de aparecer en las especialidades activas del sistema. El
+    // frontend le muestra al admin qué médicos se ven afectados ANTES de
+    // llegar acá, en el modal de confirmación.
+    await prisma.especialidad.update({ where: { idEspecialidad }, data: { activo: false } });
 
     res.json({ ok: true, message: 'Especialidad eliminada con éxito' });
   } catch (error) {

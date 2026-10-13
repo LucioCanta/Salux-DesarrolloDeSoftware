@@ -1,10 +1,16 @@
 generator client {
   provider = "prisma-client-js"
+  // rhel-openssl-3.0.x es el entorno de Vercel/AWS Lambda; "native" es tu máquina o Docker.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
+  // Conexión que usa la app en ejecución. En Supabase: el pooler de transacciones
+  // (puerto 6543, con ?pgbouncer=true&connection_limit=1), ideal para serverless.
+  url       = env("DATABASE_URL")
+  // Conexión para migraciones (prisma migrate): sin pooler de transacciones.
+  directUrl = env("DIRECT_URL")
 }
 
 model Usuario {
@@ -14,6 +20,21 @@ model Usuario {
   contrasena  String
   nomYape     String
   activo      Boolean        @default(true)
+  // Se incrementa al cambiar/resetear la contraseña: los tokens emitidos antes
+  // (access y refresh) llevan la versión vieja y dejan de valer.
+  tokenVersion Int           @default(0)
+
+  // El admin crea los médicos con una contraseña inicial: hasta que la cambien
+  // en su primer ingreso, la API solo les deja usar el cambio de contraseña.
+  debeCambiarContrasena Boolean @default(false)
+
+  // Verificación de email al registrarse (si REQUIERE_VERIFICACION_EMAIL=true).
+  // Los usuarios que ya existían quedan verificados. El token se guarda hasheado.
+  emailVerificado    Boolean   @default(true)
+  verificacionToken  String?   @unique
+  verificacionExpira DateTime?
+
+  sesiones Sesion[]
 
   // Recuperación de contraseña: token de un solo uso + vencimiento. Ambos
   // quedan en null mientras no haya un pedido de reset pendiente.
@@ -23,6 +44,31 @@ model Usuario {
   paciente    Paciente?
   medico      Medico?
   admin       Administrador?
+}
+
+// Una fila por inicio de sesión (dispositivo/navegador). El refresh token y el
+// access token llevan su id: borrar la fila cierra esa sesión de verdad, y
+// al cambiar la contraseña se borran todas.
+// Contadores de los límites de intentos (login, registro...) guardados en la
+// base: en serverless no hay memoria compartida entre invocaciones. Ver
+// src/config/rateLimitStore.js. Se limpian en la tarea de mantenimiento.
+model RateLimitContador {
+  clave    String   @id
+  hits     Int
+  expiraEn DateTime
+
+  @@index([expiraEn])
+}
+
+model Sesion {
+  idSesion  Int      @id @default(autoincrement())
+  usuarioId Int
+  usuario   Usuario  @relation(fields: [usuarioId], references: [idUsuario], onDelete: Cascade)
+  creadaEn  DateTime @default(now())
+  expiraEn  DateTime
+
+  @@index([usuarioId])
+  @@index([expiraEn])
 }
 
 model Paciente {
@@ -95,7 +141,9 @@ model Administrador {
 model Especialidad {
   idEspecialidad Int      @id @default(autoincrement())
   nombre         String   @unique
+  activo         Boolean  @default(true)
   medicos        Medico[]
+  turnos         Turno[]
 }
 
 model Turno {
@@ -113,8 +161,17 @@ model Turno {
   medicoId    Int
   medico      Medico   @relation(fields: [medicoId], references: [idMedico])
 
-  @@unique([medicoId, fechaYhora])
-  @@unique([pacienteId, fechaYhora])
+  // Especialidad por la que se reservó. Null en los turnos anteriores a que se
+  // guardara este dato (la UI cae a la primera especialidad del médico).
+  especialidadId Int?
+  especialidad   Especialidad? @relation(fields: [especialidadId], references: [idEspecialidad])
+
+  // La unicidad de horario (un médico / un paciente no pueden tener dos turnos
+  // en el mismo instante) vale SOLO para turnos no cancelados: está hecha con
+  // índices únicos PARCIALES (WHERE estado <> 'CANCELADO') en la migración, porque
+  // Prisma no los puede expresar acá. Así un turno cancelado libera su horario.
+  @@index([medicoId])
+  @@index([pacienteId])
 }
 
 enum EstadoTurno {

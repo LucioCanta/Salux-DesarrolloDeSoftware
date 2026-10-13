@@ -10,9 +10,22 @@
  * NUNCA hardcodees credenciales aquí.
  */
 
-require('dotenv').config({ override: true });
+require('dotenv').config();
+// Variables que ya vengan de la terminal (por ejemplo DATABASE_URL de Supabase)
+// tienen prioridad sobre el .env, así un script se puede apuntar a otra base
+// sin tocar el archivo. Siempre muestra a cuál se conecta.
+function mostrarBaseDeDatos() {
+  try {
+    const { host, pathname } = new URL(process.env.DATABASE_URL);
+    console.log(`🗄️  Base de datos: ${host}${pathname}`);
+  } catch {
+    console.log('🗄️  Base de datos: (DATABASE_URL inválida o ausente)');
+  }
+}
+
 const bcrypt = require('bcryptjs');
 const prisma = require('./src/config/prisma');
+const { problemasDeContrasena } = require('./src/utils/politicaContrasena');
 
 // ── Validación de variables de entorno requeridas ─────────────────────────────
 const REQUIRED_ENV_VARS = ['ADMIN_EMAIL', 'ADMIN_PASSWORD', 'ADMIN_NOMBRE', 'ADMIN_DNI'];
@@ -26,13 +39,20 @@ function validarVariablesDeEntorno() {
     process.exit(1);
   }
 
-  if (process.env.ADMIN_PASSWORD.length < 8) {
-    console.error('❌ ADMIN_PASSWORD debe tener al menos 8 caracteres.');
+  const problemas = problemasDeContrasena(process.env.ADMIN_PASSWORD, {
+    email: process.env.ADMIN_EMAIL,
+    dni: process.env.ADMIN_DNI,
+    nombre: process.env.ADMIN_NOMBRE,
+  });
+  if (problemas.length > 0) {
+    console.error('❌ ADMIN_PASSWORD no cumple la política de contraseñas:');
+    problemas.forEach((p) => console.error(`   - ${p}`));
     process.exit(1);
   }
 }
 
 async function main() {
+  mostrarBaseDeDatos();
   validarVariablesDeEntorno();
 
   const { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NOMBRE, ADMIN_DNI } = process.env;

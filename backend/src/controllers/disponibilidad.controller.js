@@ -109,6 +109,9 @@ const obtenerDisponibilidadDeMedico = async (req, res) => {
       prisma.ausenciaMedico.findMany({
         where: { medicoId, fechaFin: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } },
         orderBy: { fechaInicio: 'asc' },
+        // Sin `motivo` (puede ser un dato de salud/privado): al paciente solo le
+        // hace falta saber qué días no se puede reservar.
+        select: { idAusencia: true, fechaInicio: true, fechaFin: true },
       }),
     ]);
 

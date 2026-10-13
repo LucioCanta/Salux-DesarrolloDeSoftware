@@ -1,12 +1,6 @@
 const prisma = require('../config/prisma');
 const { emailTurnoCreado, emailTurnoConfirmado, emailTurnoCancelado } = require('../utils/email');
-const { diaCalendarioUTC, diaSemanaYMinutosArgentina } = require('../utils/fechas');
-
-function formatearFechaHora(fecha) {
-  const fechaTexto = fecha.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const horaTexto = fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-  return { fechaTexto, horaTexto };
-}
+const { diaCalendarioUTC, diaSemanaYMinutosArgentina, formatearFechaHora } = require('../utils/fechas');
 
 // Valida que `inicio` sea un horario reservable para `medico`: activo, fuera
 // de sus ausencias puntuales, dentro de su disponibilidad semanal (si
@@ -92,7 +86,7 @@ async function validarHorarioParaTurno({ medico, inicio, pacienteId, excluirTurn
 const crearTurno = async (req, res) => {
   try {
     // medicoId y fechaYhora ya vienen validados (y fechaYhora garantizada a futuro) por Zod
-    const { medicoId, fechaYhora } = req.body;
+    const { medicoId, fechaYhora, especialidadId } = req.body;
     const usuarioId = req.usuario.id;
     const inicio = new Date(fechaYhora);
 
@@ -103,7 +97,7 @@ const crearTurno = async (req, res) => {
       }),
       prisma.medico.findUnique({
         where: { idMedico: medicoId },
-        include: { usuario: { select: { activo: true } }, disponibilidades: true, ausencias: true }
+        include: { usuario: { select: { activo: true } }, disponibilidades: true, ausencias: true, especialidades: true }
       }),
     ]);
 
@@ -115,6 +109,19 @@ const crearTurno = async (req, res) => {
       return res.status(404).json({ ok: false, message: 'El médico indicado no existe' });
     }
 
+    // La especialidad reservada tiene que ser una que el médico atiende y que siga activa.
+    // Si no viene y el médico tiene una sola, es esa.
+    const activasDelMedico = medico.especialidades.filter((e) => e.activo);
+    let especialidadDelTurno = null;
+    if (especialidadId != null) {
+      especialidadDelTurno = activasDelMedico.find((e) => e.idEspecialidad === especialidadId);
+      if (!especialidadDelTurno) {
+        return res.status(400).json({ ok: false, message: 'Ese médico no atiende la especialidad indicada' });
+      }
+    } else if (activasDelMedico.length === 1) {
+      especialidadDelTurno = activasDelMedico[0];
+    }
+
     const validacion = await validarHorarioParaTurno({ medico, inicio, pacienteId: paciente.idPaciente });
     if (!validacion.ok) {
       return res.status(validacion.status).json({ ok: false, message: validacion.message });
@@ -124,9 +131,11 @@ const crearTurno = async (req, res) => {
       data: {
         fechaYhora: inicio,
         pacienteId: paciente.idPaciente,
-        medicoId: medico.idMedico
+        medicoId: medico.idMedico,
+        especialidadId: especialidadDelTurno ? especialidadDelTurno.idEspecialidad : null
       },
       include: {
+        especialidad: true,
         medico: {
           include: {
             usuario: {
@@ -162,7 +171,7 @@ const crearTurno = async (req, res) => {
     // los chequeos de arriba no llegaron a atajar a tiempo.
     if (error.code === 'P2002') {
       const indice = Array.isArray(error.meta?.target) ? error.meta.target.join(',') : String(error.meta?.target || '');
-      if (indice.includes('pacienteId')) {
+      if (indice.includes('paciente')) {
         return res.status(409).json({ ok: false, message: 'Ya tenés un turno reservado en ese mismo horario' });
       }
       return res.status(409).json({ ok: false, message: 'Ese médico ya tiene un turno reservado en ese horario' });
@@ -188,6 +197,7 @@ const obtenerMisTurnos = async (req, res) => {
       where: { pacienteId: paciente.idPaciente },
       orderBy: { fechaYhora: 'asc' },
       include: {
+        especialidad: true,
         medico: {
           include: {
             usuario: {
@@ -260,6 +270,20 @@ const actualizarEstadoTurno = async (req, res) => {
         ok: false,
         message: `El turno ya está ${turno.estado.toLowerCase()} y no admite más cambios`
       });
+    }
+
+    if (estado === turno.estado) {
+      return res.status(422).json({ ok: false, message: `El turno ya está ${estado.toLowerCase()}` });
+    }
+
+    // Reglas ligadas al horario: no se puede cerrar como realizado algo que
+    // todavía no ocurrió, ni confirmar un turno cuyo horario ya pasó.
+    const ahora = new Date();
+    if (estado === 'FINALIZADO' && turno.fechaYhora > ahora) {
+      return res.status(422).json({ ok: false, message: 'No se puede finalizar un turno que todavía no ocurrió' });
+    }
+    if (estado === 'CONFIRMADO' && turno.fechaYhora < ahora) {
+      return res.status(422).json({ ok: false, message: 'No se puede confirmar un turno cuyo horario ya pasó' });
     }
 
     const turnoActualizado = await prisma.turno.update({
@@ -356,6 +380,7 @@ const reprogramarTurno = async (req, res) => {
         confirmadoPorPaciente: false,
       },
       include: {
+        especialidad: true,
         medico: {
           include: {
             usuario: { select: { nomYape: true } },
@@ -437,6 +462,7 @@ const obtenerTurnosMedico = async (req, res) => {
       where: { medicoId: medico.idMedico },
       orderBy: { fechaYhora: 'asc' },
       include: {
+        especialidad: true,
         // Le decimos a Prisma que traiga los datos del paciente asociado a cada turno
         paciente: {
           select: {
@@ -470,6 +496,7 @@ const obtenerTodosLosTurnos = async (req, res) => {
     const turnos = await prisma.turno.findMany({
       orderBy: { fechaYhora: 'asc' },
       include: {
+        especialidad: true,
         paciente: {
           select: {
             usuario: { select: { nomYape: true, email: true } }

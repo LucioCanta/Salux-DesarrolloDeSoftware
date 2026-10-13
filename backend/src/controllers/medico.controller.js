@@ -95,6 +95,8 @@ const crearMedico = async (req, res) => {
         dni,
         contrasena: hashedPassword,
         nomYape,
+        // La contraseña la eligió el admin: el médico tiene que cambiarla al ingresar
+        debeCambiarContrasena: true,
         medico: {
           create: {
             matricula,
@@ -149,11 +151,11 @@ const obtenerMedicos = async (req, res) => {
       where: { usuario: { activo: true } },
       include: {
         // Traemos los datos del usuario, pero seleccionamos qué campos mostrar por seguridad
+        // Este listado lo ve cualquier usuario logueado (incluidos pacientes):
+        // solo el nombre, nada de email ni ids internos de cuenta.
         usuario: {
           select: {
-            idUsuario: true,
             nomYape: true,
-            email: true,
             activo: true
           }
         },
@@ -167,7 +169,17 @@ const obtenerMedicos = async (req, res) => {
     // Se calcula por médico (consulta propia de turnos existentes cada uno),
     // así que van todas en paralelo en vez de una por una.
     const medicosConDisponibilidad = await Promise.all(
-      medicos.map(async (m) => ({ ...m, proximaDisponibilidad: await calcularProximaDisponibilidad(m) }))
+      medicos.map(async (m) => {
+        // usuarioId y matrícula son datos internos/administrativos; los motivos
+        // de las ausencias, privados del médico (se usan solo para el cálculo).
+        // eslint-disable-next-line no-unused-vars
+        const { usuarioId, matricula, ausencias, ...publico } = m;
+        return {
+          ...publico,
+          ausencias: ausencias.map((a) => ({ fechaInicio: a.fechaInicio, fechaFin: a.fechaFin })),
+          proximaDisponibilidad: await calcularProximaDisponibilidad(m),
+        };
+      })
     );
 
     res.json({
@@ -247,8 +259,8 @@ const actualizarMedico = async (req, res) => {
       return res.status(400).json({ ok: false, message: 'id de médico inválido' });
     }
 
-    const { consultorio, duracionTurnoMinutos } = req.body;
-    if (consultorio === undefined && duracionTurnoMinutos === undefined) {
+    const { consultorio, duracionTurnoMinutos, especialidadesIds } = req.body;
+    if (consultorio === undefined && duracionTurnoMinutos === undefined && especialidadesIds === undefined) {
       return res.status(400).json({ ok: false, message: 'No se envió ningún campo para actualizar' });
     }
 
@@ -257,6 +269,9 @@ const actualizarMedico = async (req, res) => {
       data: {
         ...(consultorio !== undefined ? { consultorio } : {}),
         ...(duracionTurnoMinutos !== undefined ? { duracionTurnoMinutos } : {}),
+        // `set` reemplaza toda la relación muchos-a-muchos de una: así el
+        // admin puede tanto agregar como quitar especialidades en un mismo PATCH.
+        ...(especialidadesIds !== undefined ? { especialidades: { set: especialidadesIds.map((id) => ({ idEspecialidad: id })) } } : {}),
       },
       include: {
         usuario: { select: { nomYape: true, email: true, dni: true, activo: true } },
@@ -268,7 +283,7 @@ const actualizarMedico = async (req, res) => {
   } catch (error) {
     console.error(error);
     if (error.code === 'P2025') {
-      return res.status(404).json({ ok: false, message: 'Médico no encontrado' });
+      return res.status(404).json({ ok: false, message: 'Médico no encontrado, o alguna de las especialidades indicadas no existe' });
     }
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
