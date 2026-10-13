@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from './api';
+import { api, getPreferenciasAccesibilidad, guardarPreferenciasAccesibilidad } from './api';
 import NuevoTurnoModal from './NuevoTurnoModal';
 import AdminAltaModal from './AdminAltaModal';
 import PerfilModal from './PerfilModal';
@@ -49,6 +49,7 @@ function formatearTurnoAdmin(t) {
     fecha: fechaTexto,
     hora: horaTexto,
     estado: ESTADO_TEXTO[t.estado] || t.estado,
+    fechaISO: t.fechaYhora,
   };
 }
 
@@ -92,10 +93,15 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   const [menuAccesibilidadAbierto, setMenuAccesibilidadAbierto] = useState(false);
   const [menuMobileAbierto, setMenuMobileAbierto] = useState(false);
   const [alertaActiva, setAlertaActiva] = useState(true);
-  const [modoOscuro, setModoOscuro] = useState(true);
-  const [altoContraste, setAltoContraste] = useState(false);
-  const [modoAdultoMayor, setModoAdultoMayor] = useState(false);
-  const [reducirAnimaciones, setReducirAnimaciones] = useState(false);
+  const [prefsGuardadas] = useState(getPreferenciasAccesibilidad);
+  const [modoOscuro, setModoOscuro] = useState(prefsGuardadas.modoOscuro ?? true);
+  const [altoContraste, setAltoContraste] = useState(prefsGuardadas.altoContraste ?? false);
+  const [modoAdultoMayor, setModoAdultoMayor] = useState(prefsGuardadas.modoAdultoMayor ?? false);
+  const [reducirAnimaciones, setReducirAnimaciones] = useState(prefsGuardadas.reducirAnimaciones ?? false);
+
+  useEffect(() => {
+    guardarPreferenciasAccesibilidad({ modoOscuro, altoContraste, modoAdultoMayor, reducirAnimaciones });
+  }, [modoOscuro, altoContraste, modoAdultoMayor, reducirAnimaciones]);
 
   // Turnos reales del paciente logueado (sección 2.3 del documento)
   const esPaciente = usuario.rol === 'paciente';
@@ -110,6 +116,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   const [mostrarModalAlta, setMostrarModalAlta] = useState(false);
   const [mostrarModalPerfil, setMostrarModalPerfil] = useState(false);
   const [mostrarConfirmarSalir, setMostrarConfirmarSalir] = useState(false);
+  const [turnoAConfirmarCancelacion, setTurnoAConfirmarCancelacion] = useState(null);
 
   const cargarMisTurnos = () => {
     api.misTurnos()
@@ -956,6 +963,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 turno.estado === 'Finalizado' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700';
 
               const esTerminal = turno.estado === 'Finalizado' || turno.estado === 'Cancelado';
+              const yaVencido = new Date(turno.fechaISO) < new Date();
 
               return (
                 <div
@@ -982,7 +990,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   <div className="flex items-center gap-2 w-full md:w-auto justify-end">
                     <button
                       onClick={() => actualizarEstadoTurnoAdmin(turno.id, 'Confirmado')}
-                      disabled={esTerminal || turno.estado === 'Confirmado'}
+                      disabled={esTerminal || turno.estado === 'Confirmado' || yaVencido}
+                      title={yaVencido && !esTerminal ? 'El horario de este turno ya pasó' : undefined}
                       className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-emerald-500 text-emerald-400 hover:bg-emerald-600/10'
                       }`}
@@ -1046,7 +1055,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                           <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.consultorio || '—'}</td>
                           <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.duracionTurnoMinutos} min</td>
                           <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>
-                            {medico.especialidades.map((e) => e.nombre).join(', ') || '—'}
+                            {medico.especialidades.map((e) => (e.activo ? e.nombre : `${e.nombre} (inactiva)`)).join(', ') || '—'}
                           </td>
                           <td className="px-4 py-3">
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${medico.usuario.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
@@ -1120,6 +1129,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 turno.estado === 'Finalizado' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700';
 
               const finalizado = turno.estado === 'Finalizado' || turno.estado === 'Cancelado';
+              const yaOcurrio = new Date(turno.fechaISO) <= new Date();
 
               return (
                 <div
@@ -1148,7 +1158,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
                     <button
                       onClick={() => actualizarEstadoAgenda(turno.id, 'Confirmado')}
-                      disabled={finalizado || turno.estado === 'Confirmado'}
+                      disabled={finalizado || turno.estado === 'Confirmado' || yaOcurrio}
+                      title={yaOcurrio && !finalizado ? 'El horario de este turno ya pasó' : undefined}
                       className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-emerald-500 text-emerald-400 hover:bg-emerald-600/10'
                       }`}
@@ -1157,7 +1168,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                     </button>
                     <button
                       onClick={() => actualizarEstadoAgenda(turno.id, 'Finalizado')}
-                      disabled={finalizado}
+                      disabled={finalizado || !yaOcurrio}
+                      title={!yaOcurrio && !finalizado ? 'Solo se puede finalizar un turno que ya ocurrió' : undefined}
                       className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-blue-500 text-blue-400 hover:bg-blue-600/10'
                       }`}
@@ -1478,7 +1490,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                       Reprogramar
                     </button>
                     <button
-                      onClick={() => cancelarTurno(turno.id)}
+                      onClick={() => setTurnoAConfirmarCancelacion(turno)}
                       disabled={noCancelable}
                       className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-red-500 text-red-400 hover:bg-red-600/10'
@@ -1691,6 +1703,32 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             ));
           }}
         />
+      )}
+
+      {turnoAConfirmarCancelacion && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm text-slate-100 p-6 space-y-4">
+            <h2 className="font-bold text-lg">¿Cancelar este turno?</h2>
+            <p className="text-slate-400 text-sm">
+              {turnoAConfirmarCancelacion.medico} — {turnoAConfirmarCancelacion.fecha}, {turnoAConfirmarCancelacion.hora}.
+              Esta acción no se puede deshacer; si cambiás de idea tendrías que reservar un turno nuevo.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setTurnoAConfirmarCancelacion(null)}
+                className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 font-medium transition"
+              >
+                Volver
+              </button>
+              <button
+                onClick={() => { cancelarTurno(turnoAConfirmarCancelacion.id); setTurnoAConfirmarCancelacion(null); }}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition"
+              >
+                Sí, cancelar turno
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {mostrarConfirmarSalir && (

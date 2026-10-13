@@ -71,7 +71,7 @@ docker compose up --build
 ## Endpoints principales
 
 - `POST /api/auth/register` — Registro de paciente
-- `POST /api/auth/login` — Login (devuelve JWT)
+- `POST /api/auth/login` — Login con `identificador` (email o DNI) y `contrasena` (devuelve JWT)
 - `GET /api/auth/perfil` — Perfil del usuario autenticado
 - `GET /api/especialidades` — Listar especialidades
 - `POST /api/especialidades` — Crear especialidad (solo admin)

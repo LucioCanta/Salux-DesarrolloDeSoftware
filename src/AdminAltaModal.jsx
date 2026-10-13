@@ -70,7 +70,9 @@ function FormEspecialidad() {
       const { data } = await api.crearEspecialidad(nombre);
       setExito(`Especialidad "${data.nombre}" creada con éxito.`);
       setNombre('');
-      setEspecialidades((prev) => [...prev, data]);
+      // Recargamos la lista completa: la respuesta de crear no trae los
+      // médicos asignados (que sí hacen falta si fue una reactivación).
+      cargarEspecialidades();
     } catch (err) {
       setError(err.message);
     } finally {

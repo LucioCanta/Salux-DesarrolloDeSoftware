@@ -262,6 +262,20 @@ const actualizarEstadoTurno = async (req, res) => {
       });
     }
 
+    if (estado === turno.estado) {
+      return res.status(422).json({ ok: false, message: `El turno ya está ${estado.toLowerCase()}` });
+    }
+
+    // Reglas ligadas al horario: no se puede cerrar como realizado algo que
+    // todavía no ocurrió, ni confirmar un turno cuyo horario ya pasó.
+    const ahora = new Date();
+    if (estado === 'FINALIZADO' && turno.fechaYhora > ahora) {
+      return res.status(422).json({ ok: false, message: 'No se puede finalizar un turno que todavía no ocurrió' });
+    }
+    if (estado === 'CONFIRMADO' && turno.fechaYhora < ahora) {
+      return res.status(422).json({ ok: false, message: 'No se puede confirmar un turno cuyo horario ya pasó' });
+    }
+
     const turnoActualizado = await prisma.turno.update({
       where: { idTurno },
       data: { estado }

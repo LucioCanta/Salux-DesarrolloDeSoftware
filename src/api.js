@@ -38,6 +38,22 @@ export function actualizarUsuarioGuardado(usuario) {
   localStorage.setItem(USUARIO_KEY, JSON.stringify(usuario));
 }
 
+const ACCESIBILIDAD_KEY = 'salux_accesibilidad';
+
+// Preferencias de accesibilidad (tema, tamaño, animaciones): se guardan en
+// localStorage para que sobrevivan un F5 y el login/logout.
+export function getPreferenciasAccesibilidad() {
+  try {
+    return JSON.parse(localStorage.getItem(ACCESIBILIDAD_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+export function guardarPreferenciasAccesibilidad(prefs) {
+  localStorage.setItem(ACCESIBILIDAD_KEY, JSON.stringify({ ...getPreferenciasAccesibilidad(), ...prefs }));
+}
+
 async function fetchJson(path, { method = 'GET', body, credentialsInclude = false, headers = {} } = {}) {
   let res;
   try {
@@ -72,17 +88,31 @@ function armarError(data) {
 
 // Pide un Access Token nuevo usando el Refresh Token de la cookie httpOnly
 // (credentials:'include' es lo que hace que el navegador mande esa cookie).
-async function refrescarSesion() {
-  const { res, data } = await fetchJson('/auth/refresh', { method: 'POST', credentialsInclude: true });
-  if (!res.ok) {
-    accessToken = null;
-    throw armarError(data);
+// Una sola renovación a la vez: al recargar, App y los fetches del Dashboard
+// la piden en paralelo y todos comparten la misma petición en vuelo.
+let refrescoEnCurso = null;
+
+function refrescarSesion() {
+  if (!refrescoEnCurso) {
+    refrescoEnCurso = (async () => {
+      const { res, data } = await fetchJson('/auth/refresh', { method: 'POST', credentialsInclude: true });
+      if (!res.ok) {
+        accessToken = null;
+        throw armarError(data);
+      }
+      accessToken = data.token;
+      return data;
+    })().finally(() => { refrescoEnCurso = null; });
   }
-  accessToken = data.token;
-  return data;
+  return refrescoEnCurso;
 }
 
 async function request(path, { method = 'GET', body, auth = true, _reintentado = false } = {}) {
+  // Si todavía no hay Access Token pero se está renovando la sesión (recarga
+  // de página), esperamos ese resultado en vez de mandar la petición sin token.
+  if (auth && !accessToken && refrescoEnCurso) {
+    await refrescoEnCurso.catch(() => {});
+  }
   const headers = { 'Content-Type': 'application/json' };
   if (auth && accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
@@ -117,8 +147,8 @@ async function request(path, { method = 'GET', body, auth = true, _reintentado =
 // convenciones distintas para el mismo concepto — no asumas cuál es sin
 // mirar el controller correspondiente.
 export const api = {
-  login: (email, contrasena) =>
-    request('/auth/login', { method: 'POST', body: { email, contrasena }, auth: false }),
+  login: (identificador, contrasena) =>
+    request('/auth/login', { method: 'POST', body: { identificador, contrasena }, auth: false }),
   register: (datos) =>
     request('/auth/register', { method: 'POST', body: datos, auth: false }),
   refrescarSesion,

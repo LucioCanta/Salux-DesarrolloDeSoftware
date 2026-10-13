@@ -125,11 +125,12 @@ const register = async (req, res) => {
 };
 const login = async (req, res) => {
   try {
-    const { email, contrasena } = req.body;
+    const { identificador, contrasena } = req.body;
 
-    // 1. Buscamos si el usuario existe, junto con sus perfiles para saber el rol
+    // 1. Buscamos si el usuario existe (por DNI o por email, ambos únicos),
+    // junto con sus perfiles para saber el rol
     const usuario = await prisma.usuario.findUnique({
-      where: { email },
+      where: /^\d{7,9}$/.test(identificador) ? { dni: identificador } : { email: identificador },
       include: { paciente: true, medico: true, admin: true }
     });
 
