@@ -36,8 +36,12 @@ const crearEspecialidad = async (req, res) => {
 };
 const obtenerEspecialidades = async (req, res) => {
   try {
-    // Prisma busca todos los registros de la tabla
-    const especialidades = await prisma.especialidad.findMany();
+    // Incluimos los médicos asignados (con su nombre) para que el admin
+    // pueda ver a quiénes afecta antes de confirmar un borrado lógico.
+    const especialidades = await prisma.especialidad.findMany({
+      where: { activo: true },
+      include: { medicos: { include: { usuario: { select: { nomYape: true } } } } }
+    });
     
     res.json({ 
       ok: true, 
@@ -56,25 +60,19 @@ const eliminarEspecialidad = async (req, res) => {
       return res.status(400).json({ ok: false, message: 'id de especialidad inválido' });
     }
 
-    const especialidad = await prisma.especialidad.findUnique({
-      where: { idEspecialidad },
-      include: { medicos: { select: { idMedico: true } } }
-    });
+    const especialidad = await prisma.especialidad.findUnique({ where: { idEspecialidad } });
 
-    if (!especialidad) {
+    if (!especialidad || !especialidad.activo) {
       return res.status(404).json({ ok: false, message: 'Especialidad no encontrada' });
     }
 
-    // Integridad referencial: no permitimos dejar médicos "huérfanos" de
-    // especialidad. El admin tiene que desvincular a los médicos primero.
-    if (especialidad.medicos.length > 0) {
-      return res.status(409).json({
-        ok: false,
-        message: `No se puede eliminar: hay ${especialidad.medicos.length} médico(s) con esta especialidad asignada`
-      });
-    }
-
-    await prisma.especialidad.delete({ where: { idEspecialidad } });
+    // Borrado lógico: no es un delete físico, así que no hace falta
+    // desvincular médicos primero. La relación muchos-a-muchos queda intacta
+    // (el médico sigue teniendo la especialidad en su lista), simplemente
+    // deja de aparecer en las especialidades activas del sistema. El
+    // frontend le muestra al admin qué médicos se ven afectados ANTES de
+    // llegar acá, en el modal de confirmación.
+    await prisma.especialidad.update({ where: { idEspecialidad }, data: { activo: false } });
 
     res.json({ ok: true, message: 'Especialidad eliminada con éxito' });
   } catch (error) {

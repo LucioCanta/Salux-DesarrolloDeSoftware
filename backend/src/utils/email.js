@@ -52,7 +52,8 @@ async function enviarEmail({ to, subject, html }) {
     return;
   }
   try {
-    await t.sendMail({ from: process.env.EMAIL_FROM || 'Salux <no-reply@salux.local>', to, subject, html });
+    const info = await t.sendMail({ from: process.env.EMAIL_FROM || 'Salux <no-reply@salux.local>', to, subject, html });
+    console.log(`[email] Enviado a ${to} — "${subject}" (messageId: ${info.messageId})`);
   } catch (error) {
     console.error('[email] No se pudo enviar el correo:', error.message);
   }

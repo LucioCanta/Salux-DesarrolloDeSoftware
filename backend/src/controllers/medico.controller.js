@@ -247,8 +247,8 @@ const actualizarMedico = async (req, res) => {
       return res.status(400).json({ ok: false, message: 'id de médico inválido' });
     }
 
-    const { consultorio, duracionTurnoMinutos } = req.body;
-    if (consultorio === undefined && duracionTurnoMinutos === undefined) {
+    const { consultorio, duracionTurnoMinutos, especialidadesIds } = req.body;
+    if (consultorio === undefined && duracionTurnoMinutos === undefined && especialidadesIds === undefined) {
       return res.status(400).json({ ok: false, message: 'No se envió ningún campo para actualizar' });
     }
 
@@ -257,6 +257,9 @@ const actualizarMedico = async (req, res) => {
       data: {
         ...(consultorio !== undefined ? { consultorio } : {}),
         ...(duracionTurnoMinutos !== undefined ? { duracionTurnoMinutos } : {}),
+        // `set` reemplaza toda la relación muchos-a-muchos de una: así el
+        // admin puede tanto agregar como quitar especialidades en un mismo PATCH.
+        ...(especialidadesIds !== undefined ? { especialidades: { set: especialidadesIds.map((id) => ({ idEspecialidad: id })) } } : {}),
       },
       include: {
         usuario: { select: { nomYape: true, email: true, dni: true, activo: true } },
@@ -268,7 +271,7 @@ const actualizarMedico = async (req, res) => {
   } catch (error) {
     console.error(error);
     if (error.code === 'P2025') {
-      return res.status(404).json({ ok: false, message: 'Médico no encontrado' });
+      return res.status(404).json({ ok: false, message: 'Médico no encontrado, o alguna de las especialidades indicadas no existe' });
     }
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }

@@ -1686,7 +1686,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           onActualizado={(medicoActualizado) => {
             setMedicosAdmin((prev) => prev.map((m) =>
               m.idMedico === medicoActualizado.idMedico
-                ? { ...m, consultorio: medicoActualizado.consultorio, duracionTurnoMinutos: medicoActualizado.duracionTurnoMinutos }
+                ? { ...m, consultorio: medicoActualizado.consultorio, duracionTurnoMinutos: medicoActualizado.duracionTurnoMinutos, especialidades: medicoActualizado.especialidades }
                 : m
             ));
           }}

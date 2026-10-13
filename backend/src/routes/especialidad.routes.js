@@ -11,7 +11,8 @@ router.get('/', verificarToken, especialidadController.obtenerEspecialidades);
 // Ruta POST: SOLO los administradores pueden CREAR especialidades nuevas
 router.post('/', verificarToken, verificarAdmin, validate(crearEspecialidadSchema), especialidadController.crearEspecialidad);
 
-// Ruta DELETE: SOLO los administradores, y solo si no tiene médicos asignados
+// Ruta DELETE: SOLO los administradores. Es un borrado lógico (activo: false),
+// así que no se bloquea aunque tenga médicos asignados.
 router.delete('/:id', verificarToken, verificarAdmin, especialidadController.eliminarEspecialidad);
 
 module.exports = router;
