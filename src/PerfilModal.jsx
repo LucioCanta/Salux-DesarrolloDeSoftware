@@ -172,11 +172,11 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className={labelClase}>Contraseña nueva</label>
-                      <input type="password" value={contrasenaNueva} onChange={(e) => setContrasenaNueva(e.target.value)} required minLength={8} placeholder="Mínimo 8 caracteres" className={inputClase} />
+                      <input type="password" value={contrasenaNueva} onChange={(e) => setContrasenaNueva(e.target.value)} required minLength={10} placeholder="Mínimo 10 caracteres" className={inputClase} />
                     </div>
                     <div>
                       <label className={labelClase}>Confirmar contraseña</label>
-                      <input type="password" value={confirmarContrasena} onChange={(e) => setConfirmarContrasena(e.target.value)} required minLength={8} className={inputClase} />
+                      <input type="password" value={confirmarContrasena} onChange={(e) => setConfirmarContrasena(e.target.value)} required minLength={10} className={inputClase} />
                     </div>
                   </div>
 
@@ -184,6 +184,22 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
                     {cambiandoPassword ? 'Actualizando...' : 'Cambiar contraseña'}
                   </button>
                 </form>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!window.confirm('Se cerrará tu sesión en todos los dispositivos, incluido este. ¿Continuar?')) return;
+                    try {
+                      await api.logoutTodas();
+                      window.location.reload();
+                    } catch (err) {
+                      setErrorPassword(err.message);
+                    }
+                  }}
+                  className="w-full mt-3 text-red-400 hover:text-red-300 text-sm font-medium"
+                >
+                  Cerrar sesión en todos los dispositivos
+                </button>
               </div>
             </>
           )}

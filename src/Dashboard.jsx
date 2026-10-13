@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from './api';
+import { api, getPreferenciasAccesibilidad, guardarPreferenciasAccesibilidad } from './api';
 import NuevoTurnoModal from './NuevoTurnoModal';
 import AdminAltaModal from './AdminAltaModal';
 import PerfilModal from './PerfilModal';
@@ -26,7 +26,7 @@ function formatearTurno(t) {
   return {
     id: t.idTurno,
     medicoId: t.medico?.idMedico,
-    especialidad: t.medico?.especialidades?.[0]?.nombre || 'Consulta general',
+    especialidad: t.especialidad?.nombre || t.medico?.especialidades?.[0]?.nombre || 'Consulta general',
     medico: t.medico?.usuario?.nomYape || 'Médico',
     consultorio: t.medico?.consultorio ? `Consultorio ${t.medico.consultorio}` : 'Consultorio a confirmar',
     fecha: fechaTexto.charAt(0).toUpperCase() + fechaTexto.slice(1),
@@ -44,11 +44,12 @@ function formatearTurnoAdmin(t) {
   return {
     id: t.idTurno,
     paciente: t.paciente?.usuario?.nomYape || 'Paciente',
-    especialidad: t.medico?.especialidades?.[0]?.nombre || 'Consulta general',
+    especialidad: t.especialidad?.nombre || t.medico?.especialidades?.[0]?.nombre || 'Consulta general',
     medico: t.medico?.usuario?.nomYape || 'Médico',
     fecha: fechaTexto,
     hora: horaTexto,
     estado: ESTADO_TEXTO[t.estado] || t.estado,
+    fechaISO: t.fechaYhora,
   };
 }
 
@@ -92,10 +93,15 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   const [menuAccesibilidadAbierto, setMenuAccesibilidadAbierto] = useState(false);
   const [menuMobileAbierto, setMenuMobileAbierto] = useState(false);
   const [alertaActiva, setAlertaActiva] = useState(true);
-  const [modoOscuro, setModoOscuro] = useState(true);
-  const [altoContraste, setAltoContraste] = useState(false);
-  const [modoAdultoMayor, setModoAdultoMayor] = useState(false);
-  const [reducirAnimaciones, setReducirAnimaciones] = useState(false);
+  const [prefsGuardadas] = useState(getPreferenciasAccesibilidad);
+  const [modoOscuro, setModoOscuro] = useState(prefsGuardadas.modoOscuro ?? true);
+  const [altoContraste, setAltoContraste] = useState(prefsGuardadas.altoContraste ?? false);
+  const [modoAdultoMayor, setModoAdultoMayor] = useState(prefsGuardadas.modoAdultoMayor ?? false);
+  const [reducirAnimaciones, setReducirAnimaciones] = useState(prefsGuardadas.reducirAnimaciones ?? false);
+
+  useEffect(() => {
+    guardarPreferenciasAccesibilidad({ modoOscuro, altoContraste, modoAdultoMayor, reducirAnimaciones });
+  }, [modoOscuro, altoContraste, modoAdultoMayor, reducirAnimaciones]);
 
   // Turnos reales del paciente logueado (sección 2.3 del documento)
   const esPaciente = usuario.rol === 'paciente';
@@ -110,6 +116,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   const [mostrarModalAlta, setMostrarModalAlta] = useState(false);
   const [mostrarModalPerfil, setMostrarModalPerfil] = useState(false);
   const [mostrarConfirmarSalir, setMostrarConfirmarSalir] = useState(false);
+  // { descripcion, ejecutar }: qué turno se va a cancelar y la acción a correr al confirmar
+  const [confirmacionCancelacion, setConfirmacionCancelacion] = useState(null);
 
   const cargarMisTurnos = () => {
     api.misTurnos()
@@ -956,6 +964,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 turno.estado === 'Finalizado' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700';
 
               const esTerminal = turno.estado === 'Finalizado' || turno.estado === 'Cancelado';
+              const yaVencido = new Date(turno.fechaISO) < new Date();
 
               return (
                 <div
@@ -982,7 +991,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   <div className="flex items-center gap-2 w-full md:w-auto justify-end">
                     <button
                       onClick={() => actualizarEstadoTurnoAdmin(turno.id, 'Confirmado')}
-                      disabled={esTerminal || turno.estado === 'Confirmado'}
+                      disabled={esTerminal || turno.estado === 'Confirmado' || yaVencido}
+                      title={yaVencido && !esTerminal ? 'El horario de este turno ya pasó' : undefined}
                       className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-emerald-500 text-emerald-400 hover:bg-emerald-600/10'
                       }`}
@@ -990,7 +1000,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                       Confirmar
                     </button>
                     <button
-                      onClick={() => actualizarEstadoTurnoAdmin(turno.id, 'Cancelado')}
+                      onClick={() => setConfirmacionCancelacion({ descripcion: `${turno.paciente} con ${turno.medico} — ${turno.fecha}, ${turno.hora}`, ejecutar: () => actualizarEstadoTurnoAdmin(turno.id, 'Cancelado') })}
                       disabled={esTerminal}
                       className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-red-500 text-red-400 hover:bg-red-600/10'
@@ -1025,7 +1035,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               )}
 
               {!cargandoMedicosAdmin && !errorMedicosAdmin && medicosAdmin.length > 0 && (
-                <div className={`overflow-x-auto rounded-xl border ${altoContraste ? 'bg-white border-black' : 'border-slate-700 bg-slate-800'}`}>
+                <>
+                <div className={`hidden md:block overflow-x-auto rounded-xl border ${altoContraste ? 'bg-white border-black' : 'border-slate-700 bg-slate-800'}`}>
                   <table className="w-full text-left" style={{ fontSize: modoAdultoMayor ? '16px' : '14px' }}>
                     <thead>
                       <tr className={`border-b ${altoContraste ? 'border-black' : 'border-slate-700'}`}>
@@ -1046,7 +1057,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                           <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.consultorio || '—'}</td>
                           <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.duracionTurnoMinutos} min</td>
                           <td className={`px-4 py-3 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>
-                            {medico.especialidades.map((e) => e.nombre).join(', ') || '—'}
+                            {medico.especialidades.map((e) => (e.activo ? e.nombre : `${e.nombre} (inactiva)`)).join(', ') || '—'}
                           </td>
                           <td className="px-4 py-3">
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${medico.usuario.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
@@ -1077,6 +1088,47 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                     </tbody>
                   </table>
                 </div>
+
+                {/* En pantallas chicas la tabla no entra: una tarjeta por médico */}
+                <div className="md:hidden space-y-3">
+                  {medicosAdmin.map((medico) => (
+                    <div key={medico.idMedico} className={`p-4 rounded-xl border space-y-2 ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800'}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-bold">{medico.usuario.nomYape}</h3>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${medico.usuario.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          {medico.usuario.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </div>
+                      <p className={`text-sm break-all ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{medico.usuario.email}</p>
+                      <p className={`text-xs ${altoContraste ? 'text-black' : 'text-slate-400'}`}>
+                        DNI {medico.usuario.dni} · Mat. {medico.matricula} · Cons. {medico.consultorio || '—'} · {medico.duracionTurnoMinutos} min
+                      </p>
+                      <p className={`text-xs ${altoContraste ? 'text-black' : 'text-slate-400'}`}>
+                        {medico.especialidades.map((e) => (e.activo ? e.nombre : `${e.nombre} (inactiva)`)).join(', ') || 'Sin especialidades'}
+                      </p>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => setMedicoEditando(medico)}
+                          className={`flex-1 border px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                            altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+                          }`}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => toggleEstadoMedico(medico)}
+                          className={`flex-1 border px-3 py-2 rounded-lg text-sm font-semibold transition ${
+                            altoContraste ? 'border-black text-black hover:bg-slate-100' :
+                            medico.usuario.activo ? 'border-red-500 text-red-400 hover:bg-red-600/10' : 'border-emerald-500 text-emerald-400 hover:bg-emerald-600/10'
+                          }`}
+                        >
+                          {medico.usuario.activo ? 'Desactivar' : 'Activar'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                </>
               )}
             </>
           )}
@@ -1120,6 +1172,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 turno.estado === 'Finalizado' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700';
 
               const finalizado = turno.estado === 'Finalizado' || turno.estado === 'Cancelado';
+              const yaOcurrio = new Date(turno.fechaISO) <= new Date();
 
               return (
                 <div
@@ -1148,7 +1201,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
                     <button
                       onClick={() => actualizarEstadoAgenda(turno.id, 'Confirmado')}
-                      disabled={finalizado || turno.estado === 'Confirmado'}
+                      disabled={finalizado || turno.estado === 'Confirmado' || yaOcurrio}
+                      title={yaOcurrio && !finalizado ? 'El horario de este turno ya pasó' : undefined}
                       className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-emerald-500 text-emerald-400 hover:bg-emerald-600/10'
                       }`}
@@ -1157,7 +1211,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                     </button>
                     <button
                       onClick={() => actualizarEstadoAgenda(turno.id, 'Finalizado')}
-                      disabled={finalizado}
+                      disabled={finalizado || !yaOcurrio}
+                      title={!yaOcurrio && !finalizado ? 'Solo se puede finalizar un turno que ya ocurrió' : undefined}
                       className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-blue-500 text-blue-400 hover:bg-blue-600/10'
                       }`}
@@ -1165,7 +1220,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                       Finalizar
                     </button>
                     <button
-                      onClick={() => actualizarEstadoAgenda(turno.id, 'Cancelado')}
+                      onClick={() => setConfirmacionCancelacion({ descripcion: `${turno.paciente} — ${turno.fecha}, ${turno.hora}`, ejecutar: () => actualizarEstadoAgenda(turno.id, 'Cancelado') })}
                       disabled={finalizado}
                       className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-red-500 text-red-400 hover:bg-red-600/10'
@@ -1478,7 +1533,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                       Reprogramar
                     </button>
                     <button
-                      onClick={() => cancelarTurno(turno.id)}
+                      onClick={() => setConfirmacionCancelacion({ descripcion: `${turno.medico} — ${turno.fecha}, ${turno.hora}`, ejecutar: () => cancelarTurno(turno.id) })}
                       disabled={noCancelable}
                       className={`border px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed ${
                         altoContraste ? 'border-black text-black hover:bg-slate-100' : 'border-red-500 text-red-400 hover:bg-red-600/10'
@@ -1686,11 +1741,37 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           onActualizado={(medicoActualizado) => {
             setMedicosAdmin((prev) => prev.map((m) =>
               m.idMedico === medicoActualizado.idMedico
-                ? { ...m, consultorio: medicoActualizado.consultorio, duracionTurnoMinutos: medicoActualizado.duracionTurnoMinutos }
+                ? { ...m, consultorio: medicoActualizado.consultorio, duracionTurnoMinutos: medicoActualizado.duracionTurnoMinutos, especialidades: medicoActualizado.especialidades }
                 : m
             ));
           }}
         />
+      )}
+
+      {confirmacionCancelacion && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm text-slate-100 p-6 space-y-4">
+            <h2 className="font-bold text-lg">¿Cancelar este turno?</h2>
+            <p className="text-slate-400 text-sm">
+              {confirmacionCancelacion.descripcion}.
+              Esta acción no se puede deshacer; si cambiás de idea tendrías que reservar un turno nuevo.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setConfirmacionCancelacion(null)}
+                className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 font-medium transition"
+              >
+                Volver
+              </button>
+              <button
+                onClick={() => { confirmacionCancelacion.ejecutar(); setConfirmacionCancelacion(null); }}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition"
+              >
+                Sí, cancelar turno
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {mostrarConfirmarSalir && (

@@ -2,9 +2,17 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const prisma = require('../config/prisma');
-const { emailResetContrasena } = require('../utils/email');
+const { emailResetContrasena, emailVerificacionCuenta, emailRegistroDuplicado } = require('../utils/email');
+const { problemasDeContrasena } = require('../utils/politicaContrasena');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
+const VERIFICACION_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+const sha256 = (texto) => crypto.createHash('sha256').update(texto).digest('hex');
+const origenFrontend = () => (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',')[0];
+// Con REQUIERE_VERIFICACION_EMAIL=true una cuenta nueva no puede iniciar
+// sesión hasta confirmar su email (recomendado en producción).
+const requiereVerificacionEmail = () => process.env.REQUIERE_VERIFICACION_EMAIL === 'true';
 
 // Hash "señuelo" contra el que comparar cuando el email no existe, para que
 // bcrypt.compare tarde lo mismo en ambos casos (ver login más abajo).
@@ -28,6 +36,7 @@ function serializarPerfil(usuario, rol) {
     nombre: usuario.nomYape,
     dni: usuario.dni,
     rol,
+    debeCambiarContrasena: usuario.debeCambiarContrasena,
   };
 
   if (rol === 'paciente' && usuario.paciente) {
@@ -43,20 +52,39 @@ function serializarPerfil(usuario, rol) {
   return perfil;
 }
 
+// Datos del usuario que se devuelven al iniciar/renovar sesión.
+function usuarioDeSesion(usuario, rol) {
+  return {
+    id: usuario.idUsuario,
+    email: usuario.email,
+    nombre: usuario.nomYape,
+    rol,
+    debeCambiarContrasena: usuario.debeCambiarContrasena,
+  };
+}
+
+// Cada inicio de sesión crea una fila en `Sesion`: es lo que permite cerrarla
+// de verdad (logout, cambio de contraseña) en vez de esperar a que venza el token.
+function crearSesion(usuarioId, cliente = prisma) {
+  return cliente.sesion.create({
+    data: { usuarioId, expiraEn: new Date(Date.now() + REFRESH_TOKEN_TTL_MS) },
+  });
+}
+
 // Arma el Access Token (corta duración, va en el body de la respuesta) y el
 // Refresh Token (larga duración, va SOLO en una cookie httpOnly) para un
-// usuario ya autenticado.
-function generarTokens(usuario, rol) {
+// usuario ya autenticado. Ambos llevan el id de su sesión (`sid`).
+function generarTokens(usuario, rol, sesion) {
   const accessToken = jwt.sign(
-    { id: usuario.idUsuario, email: usuario.email, rol },
+    { id: usuario.idUsuario, email: usuario.email, rol, tv: usuario.tokenVersion, sid: sesion.idSesion },
     process.env.JWT_SECRET,
-    { expiresIn: ACCESS_TOKEN_TTL }
+    { expiresIn: ACCESS_TOKEN_TTL, algorithm: 'HS256' }
   );
 
   const refreshToken = jwt.sign(
-    { id: usuario.idUsuario },
+    { id: usuario.idUsuario, tv: usuario.tokenVersion, sid: sesion.idSesion },
     process.env.JWT_REFRESH_SECRET,
-    { expiresIn: REFRESH_TOKEN_TTL }
+    { expiresIn: REFRESH_TOKEN_TTL, algorithm: 'HS256' }
   );
 
   return { accessToken, refreshToken };
@@ -74,27 +102,70 @@ function setRefreshCookie(res, refreshToken) {
   });
 }
 
+// Un solo mensaje para TODO fallo de login (usuario inexistente, contraseña
+// incorrecta o cuenta sin verificar): si fueran distintos, alguien podría
+// averiguar qué cuentas existen. Con verificación activa agrega la pista de
+// que una cuenta recién creada hay que activarla por email.
+const mensajeCredencialesInvalidas = () =>
+  requiereVerificacionEmail()
+    ? 'Credenciales inválidas. Si te registraste hace poco, activá tu cuenta con el enlace que te enviamos por email.'
+    : 'Credenciales inválidas';
+
+// Genera un enlace de verificación nuevo y lo manda por email.
+async function enviarVerificacion(usuario) {
+  const tokenPlano = crypto.randomBytes(32).toString('hex');
+  await prisma.usuario.update({
+    where: { idUsuario: usuario.idUsuario },
+    data: { verificacionToken: sha256(tokenPlano), verificacionExpira: new Date(Date.now() + VERIFICACION_TTL_MS) }
+  });
+  await emailVerificacionCuenta({ to: usuario.email, nombre: usuario.nomYape, link: `${origenFrontend()}/?verificar=${tokenPlano}` });
+}
+
+const MENSAJE_REGISTRO_CON_VERIFICACION =
+  'Si los datos son válidos, te enviamos un email para activar tu cuenta. Revisá tu bandeja de entrada (y el correo no deseado).';
+
 const register = async (req, res) => {
   try {
-    // 1. Recibimos los datos del cliente (React)
     const { email, dni, contrasena, nomYape } = req.body;
+    const exigeVerificacion = requiereVerificacionEmail();
 
-    // 2. Verificamos si el usuario ya existe
     const usuarioExistente = await prisma.usuario.findFirst({
-      where: {
-        OR: [{ email }, { dni }]
-      }
+      where: { OR: [{ email }, { dni }] }
     });
 
+    if (exigeVerificacion) {
+      // Respuesta idéntica exista o no la cuenta: así el registro no sirve
+      // para averiguar qué emails o DNI están registrados.
+      if (usuarioExistente) {
+        // Mismo costo de CPU que un alta real, para no delatarse por tiempo.
+        await bcrypt.hash(contrasena, 12);
+        if (usuarioExistente.email === email) {
+          emailRegistroDuplicado({ to: usuarioExistente.email, nombre: usuarioExistente.nomYape }).catch(() => {});
+        }
+        return res.status(202).json({ ok: true, requiereVerificacion: true, message: MENSAJE_REGISTRO_CON_VERIFICACION });
+      }
+
+      const hashedPassword = await bcrypt.hash(contrasena, 12);
+      const tokenPlano = crypto.randomBytes(32).toString('hex');
+      await prisma.usuario.create({
+        data: {
+          email, dni, contrasena: hashedPassword, nomYape,
+          emailVerificado: false,
+          verificacionToken: sha256(tokenPlano),
+          verificacionExpira: new Date(Date.now() + VERIFICACION_TTL_MS),
+          paciente: { create: {} }
+        }
+      });
+      emailVerificacionCuenta({ to: email, nombre: nomYape, link: `${origenFrontend()}/?verificar=${tokenPlano}` }).catch(() => {});
+      return res.status(202).json({ ok: true, requiereVerificacion: true, message: MENSAJE_REGISTRO_CON_VERIFICACION });
+    }
+
+    // Sin verificación (desarrollo/demo): alta directa, con mensaje de conflicto explícito.
     if (usuarioExistente) {
       return res.status(409).json({ ok: false, message: 'El email o DNI ya está registrado' });
     }
 
-    // 3. Hasheamos la contraseña con bcrypt (12 salt rounds como pide el documento)
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(contrasena, saltRounds);
-
-    // 4. Creamos el Usuario y su perfil de Paciente asociado en una sola transacción
+    const hashedPassword = await bcrypt.hash(contrasena, 12);
     const nuevoUsuario = await prisma.usuario.create({
       data: {
         email,
@@ -118,18 +189,55 @@ const register = async (req, res) => {
     console.error(error);
     // Carrera entre dos registros simultáneos con el mismo email/dni
     if (error.code === 'P2002') {
+      if (requiereVerificacionEmail()) {
+        return res.status(202).json({ ok: true, requiereVerificacion: true, message: MENSAJE_REGISTRO_CON_VERIFICACION });
+      }
       return res.status(409).json({ ok: false, message: 'El email o DNI ya está registrado' });
     }
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
+
+// Confirma el email con el enlace que llegó por correo.
+const verificarEmail = async (req, res) => {
+  try {
+    const usuario = await prisma.usuario.findUnique({ where: { verificacionToken: sha256(req.body.token) } });
+    if (!usuario || !usuario.verificacionExpira || usuario.verificacionExpira.getTime() < Date.now()) {
+      return res.status(400).json({ ok: false, message: 'El enlace no es válido o ya venció. Pedí uno nuevo.' });
+    }
+    await prisma.usuario.update({
+      where: { idUsuario: usuario.idUsuario },
+      data: { emailVerificado: true, verificacionToken: null, verificacionExpira: null }
+    });
+    res.json({ ok: true, message: 'Email verificado. Ya podés iniciar sesión.' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+};
+
+// Reenvía el enlace de verificación. Responde siempre lo mismo.
+const reenviarVerificacion = async (req, res) => {
+  try {
+    const usuario = await prisma.usuario.findUnique({ where: { email: req.body.email } });
+    if (usuario && usuario.activo && !usuario.emailVerificado) {
+      enviarVerificacion(usuario).catch((error) => console.error('[verificación] No se pudo reenviar:', error.message));
+    }
+    res.json({ ok: true, message: 'Si la cuenta existe y falta verificarla, te enviamos un nuevo enlace.' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
+};
+
 const login = async (req, res) => {
   try {
-    const { email, contrasena } = req.body;
+    const { identificador, contrasena } = req.body;
 
-    // 1. Buscamos si el usuario existe, junto con sus perfiles para saber el rol
+    // 1. Buscamos si el usuario existe (por DNI o por email, ambos únicos),
+    // junto con sus perfiles para saber el rol
     const usuario = await prisma.usuario.findUnique({
-      where: { email },
+      where: /^\d{7,9}$/.test(identificador) ? { dni: identificador } : { email: identificador },
       include: { paciente: true, medico: true, admin: true }
     });
 
@@ -138,7 +246,7 @@ const login = async (req, res) => {
     // tiempo de respuesta no delate si un email está registrado o no.
     const passwordValida = await bcrypt.compare(contrasena, usuario?.contrasena || HASH_SENUELO);
     if (!usuario || !passwordValida) {
-      return res.status(401).json({ ok: false, message: 'Credenciales inválidas' });
+      return res.status(401).json({ ok: false, message: mensajeCredencialesInvalidas() });
     }
 
     // 2.1 Bloqueamos el acceso si la cuenta fue desactivada por un administrador
@@ -146,15 +254,30 @@ const login = async (req, res) => {
       return res.status(403).json({ ok: false, message: 'Tu cuenta está desactivada. Contactá a un administrador.' });
     }
 
+    // 2.2 La contraseña es correcta pero el email nunca se confirmó. Hacia
+    // afuera es IDÉNTICO a una contraseña incorrecta (mismo código y mensaje):
+    // así nadie puede usar el login para saber si una cuenta existe. Para no
+    // dejar al usuario legítimo sin salida, se le reenvía el enlace (sin
+    // insistir si ya se le mandó uno hace poco).
+    if (!usuario.emailVerificado) {
+      res.status(401).json({ ok: false, message: mensajeCredencialesInvalidas() });
+      const enlaceReciente = usuario.verificacionExpira && usuario.verificacionExpira.getTime() - Date.now() > VERIFICACION_TTL_MS - 60 * 60 * 1000;
+      if (!enlaceReciente) {
+        enviarVerificacion(usuario).catch((error) => console.error('[verificación] No se pudo reenviar:', error.message));
+      }
+      return;
+    }
+
     const rol = derivarRol(usuario);
-    const { accessToken, refreshToken } = generarTokens(usuario, rol);
+    const sesion = await crearSesion(usuario.idUsuario);
+    const { accessToken, refreshToken } = generarTokens(usuario, rol, sesion);
     setRefreshCookie(res, refreshToken);
 
     res.json({
       ok: true,
       message: 'Inicio de sesión exitoso',
       token: accessToken,
-      usuario: { id: usuario.idUsuario, email: usuario.email, nombre: usuario.nomYape, rol }
+      usuario: usuarioDeSesion(usuario, rol)
     });
 
   } catch (error) {
@@ -176,32 +299,43 @@ const refresh = async (req, res) => {
 
     let payload;
     try {
-      payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+      payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET, { algorithms: ['HS256'] });
     } catch {
       res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/auth' });
       return res.status(401).json({ ok: false, message: 'La sesión venció, iniciá sesión de nuevo' });
     }
 
-    const usuario = await prisma.usuario.findUnique({
-      where: { idUsuario: payload.id },
-      include: { paciente: true, medico: true, admin: true }
+    const sesion = await prisma.sesion.findUnique({
+      where: { idSesion: payload.sid ?? -1 },
+      include: { usuario: { include: { paciente: true, medico: true, admin: true } } }
     });
+    const usuario = sesion?.usuario;
 
-    if (!usuario || !usuario.activo) {
+    // La sesión tiene que existir (logout/cambio de contraseña la borran), ser
+    // de este usuario y no haber vencido; la cuenta, seguir activa y verificada.
+    // Tokens anteriores a un cambio de contraseña llevan una versión vieja.
+    if (
+      !sesion || sesion.usuarioId !== payload.id || sesion.expiraEn.getTime() < Date.now() ||
+      !usuario.activo || !usuario.emailVerificado || (payload.tv ?? 0) !== usuario.tokenVersion
+    ) {
       res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/auth' });
       return res.status(401).json({ ok: false, message: 'Sesión inválida' });
     }
 
     const rol = derivarRol(usuario);
-    // Rotamos también el refresh token en cada renovación (mejor práctica:
-    // limita la ventana útil de un refresh token robado).
-    const { accessToken, refreshToken } = generarTokens(usuario, rol);
+    // Renovación "deslizante": cada uso extiende la sesión otros 7 días y se
+    // emite una cookie nueva (la sesión sigue siendo la misma fila).
+    await prisma.sesion.update({
+      where: { idSesion: sesion.idSesion },
+      data: { expiraEn: new Date(Date.now() + REFRESH_TOKEN_TTL_MS) }
+    });
+    const { accessToken, refreshToken } = generarTokens(usuario, rol, sesion);
     setRefreshCookie(res, refreshToken);
 
     res.json({
       ok: true,
       token: accessToken,
-      usuario: { id: usuario.idUsuario, email: usuario.email, nombre: usuario.nomYape, rol }
+      usuario: usuarioDeSesion(usuario, rol)
     });
   } catch (error) {
     console.error(error);
@@ -209,12 +343,38 @@ const refresh = async (req, res) => {
   }
 };
 
-// Invalida la cookie del Refresh Token. El Access Token en memoria lo
-// descarta el propio cliente (no hay nada que hacer server-side con él,
-// ya que expira solo a los 15 min).
-const logout = (req, res) => {
+// Cierra la sesión de verdad: borra su fila (el refresh y el access token de
+// esa sesión dejan de valer al instante) y limpia la cookie. Si la cookie falta
+// o está vencida igual se limpia, sin error.
+const logout = async (req, res) => {
+  try {
+    const token = req.cookies?.[REFRESH_COOKIE_NAME];
+    if (token) {
+      const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET, { algorithms: ['HS256'], ignoreExpiration: true });
+      if (payload.sid) {
+        await prisma.sesion.deleteMany({ where: { idSesion: payload.sid, usuarioId: payload.id } });
+      }
+    }
+  } catch {
+    // cookie inválida/manipulada: no hay sesión que cerrar
+  }
   res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/auth' });
   res.json({ ok: true, message: 'Sesión cerrada' });
+};
+
+// Cierra la sesión en TODOS los dispositivos (por ejemplo si se perdió el celular).
+const logoutTodas = async (req, res) => {
+  try {
+    await prisma.$transaction([
+      prisma.sesion.deleteMany({ where: { usuarioId: req.usuario.id } }),
+      prisma.usuario.update({ where: { idUsuario: req.usuario.id }, data: { tokenVersion: { increment: 1 } } }),
+    ]);
+    res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/auth' });
+    res.json({ ok: true, message: 'Cerraste sesión en todos tus dispositivos' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+  }
 };
 
 const obtenerPerfil = async (req, res) => {
@@ -269,7 +429,10 @@ const cambiarContrasena = async (req, res) => {
   try {
     const { contrasenaActual, contrasenaNueva } = req.body;
 
-    const usuario = await prisma.usuario.findUnique({ where: { idUsuario: req.usuario.id } });
+    const usuario = await prisma.usuario.findUnique({
+      where: { idUsuario: req.usuario.id },
+      include: { paciente: true, medico: true, admin: true }
+    });
     if (!usuario) {
       return res.status(401).json({ ok: false, message: 'Usuario no válido' });
     }
@@ -279,13 +442,38 @@ const cambiarContrasena = async (req, res) => {
       return res.status(401).json({ ok: false, message: 'La contraseña actual es incorrecta' });
     }
 
+    if (await bcrypt.compare(contrasenaNueva, usuario.contrasena)) {
+      return res.status(400).json({ ok: false, message: 'La contraseña nueva tiene que ser distinta de la actual' });
+    }
+    // Lo que depende de la cuenta (DNI, email, nombre) no lo puede ver el schema.
+    const conContexto = problemasDeContrasena(contrasenaNueva, { email: usuario.email, dni: usuario.dni, nombre: usuario.nomYape })
+      .filter((m) => /DNI|email|nombre/.test(m));
+    if (conContexto.length > 0) {
+      return res.status(400).json({ ok: false, message: conContexto[0] });
+    }
+
     const hashNuevo = await bcrypt.hash(contrasenaNueva, 12);
-    await prisma.usuario.update({
-      where: { idUsuario: usuario.idUsuario },
-      data: { contrasena: hashNuevo }
+    // Cierra TODAS las sesiones (si alguien tenía la contraseña vieja o un
+    // refresh token robado, deja de servirle) y abre una nueva para esta.
+    const { actualizado, sesion } = await prisma.$transaction(async (tx) => {
+      const actualizado = await tx.usuario.update({
+        where: { idUsuario: usuario.idUsuario },
+        data: { contrasena: hashNuevo, tokenVersion: { increment: 1 }, debeCambiarContrasena: false }
+      });
+      await tx.sesion.deleteMany({ where: { usuarioId: usuario.idUsuario } });
+      return { actualizado, sesion: await crearSesion(usuario.idUsuario, tx) };
     });
 
-    res.json({ ok: true, message: 'Contraseña actualizada con éxito' });
+    const rol = derivarRol(usuario);
+    const { accessToken, refreshToken } = generarTokens(actualizado, rol, sesion);
+    setRefreshCookie(res, refreshToken);
+
+    res.json({
+      ok: true,
+      message: 'Contraseña actualizada con éxito',
+      token: accessToken,
+      usuario: usuarioDeSesion(actualizado, rol)
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
@@ -339,10 +527,18 @@ const resetearContrasena = async (req, res) => {
     }
 
     const hashNuevo = await bcrypt.hash(contrasenaNueva, 12);
-    await prisma.usuario.update({
-      where: { idUsuario: usuario.idUsuario },
-      data: { contrasena: hashNuevo, resetPasswordToken: null, resetPasswordExpira: null }
-    });
+    // Cerrar todas las sesiones; y como el enlace llegó a su casilla, el email
+    // queda verificado y ya no hace falta cambiar una contraseña inicial.
+    await prisma.$transaction([
+      prisma.usuario.update({
+        where: { idUsuario: usuario.idUsuario },
+        data: {
+          contrasena: hashNuevo, resetPasswordToken: null, resetPasswordExpira: null,
+          tokenVersion: { increment: 1 }, emailVerificado: true, debeCambiarContrasena: false
+        }
+      }),
+      prisma.sesion.deleteMany({ where: { usuarioId: usuario.idUsuario } }),
+    ]);
 
     res.json({ ok: true, message: 'Contraseña actualizada. Ya podés iniciar sesión.' });
   } catch (error) {
@@ -356,6 +552,9 @@ module.exports = {
   login,
   refresh,
   logout,
+  logoutTodas,
+  verificarEmail,
+  reenviarVerificacion,
   obtenerPerfil,
   actualizarPerfil,
   cambiarContrasena,

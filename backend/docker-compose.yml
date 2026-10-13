@@ -8,8 +8,14 @@ services:
       # Nunca hardcodees la contraseña aquí.
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: salux_db
+      # En una instalación nueva la imagen crea este usuario con permisos solo
+      # sobre MYSQL_DATABASE. (En una base ya creada hay que crearlo a mano: ver README.)
+      MYSQL_USER: ${MYSQL_APP_USER}
+      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD}
     ports:
-      - "3306:3306"
+      # Solo accesible desde esta máquina (Prisma Studio, un cliente SQL):
+      # publicar 3306 en 0.0.0.0 deja la base abierta a toda la red.
+      - "127.0.0.1:3306:3306"
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     volumes:
       - mysql_data:/var/lib/mysql
@@ -20,6 +26,22 @@ services:
       timeout: 5s
       retries: 5
 
+  # Contadores de los límites de intentos (login, registro, etc.): compartidos
+  # entre instancias y que sobreviven a un reinicio. Solo accesible dentro de
+  # la red de docker-compose (no se publica ningún puerto).
+  redis:
+    image: redis:7-alpine
+    container_name: salux_redis_container
+    restart: always
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
   backend:
     build: .
     container_name: salux_backend_container
@@ -28,11 +50,14 @@ services:
       - .env
     environment:
       # Dentro de la red de docker-compose, la DB se resuelve por el nombre del servicio, no "localhost".
-      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@mysql-db:3306/salux_db
+      DATABASE_URL: mysql://${MYSQL_APP_USER}:${MYSQL_APP_PASSWORD}@mysql-db:3306/salux_db
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     ports:
       - "${PORT:-3000}:3000"
     depends_on:
       mysql-db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     # Aplica migraciones pendientes antes de levantar el servidor.
     # Se invoca el archivo real del paquete con node en vez de depender de

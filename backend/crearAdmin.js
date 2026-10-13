@@ -13,6 +13,7 @@
 require('dotenv').config({ override: true });
 const bcrypt = require('bcryptjs');
 const prisma = require('./src/config/prisma');
+const { problemasDeContrasena } = require('./src/utils/politicaContrasena');
 
 // ── Validación de variables de entorno requeridas ─────────────────────────────
 const REQUIRED_ENV_VARS = ['ADMIN_EMAIL', 'ADMIN_PASSWORD', 'ADMIN_NOMBRE', 'ADMIN_DNI'];
@@ -26,8 +27,14 @@ function validarVariablesDeEntorno() {
     process.exit(1);
   }
 
-  if (process.env.ADMIN_PASSWORD.length < 8) {
-    console.error('❌ ADMIN_PASSWORD debe tener al menos 8 caracteres.');
+  const problemas = problemasDeContrasena(process.env.ADMIN_PASSWORD, {
+    email: process.env.ADMIN_EMAIL,
+    dni: process.env.ADMIN_DNI,
+    nombre: process.env.ADMIN_NOMBRE,
+  });
+  if (problemas.length > 0) {
+    console.error('❌ ADMIN_PASSWORD no cumple la política de contraseñas:');
+    problemas.forEach((p) => console.error(`   - ${p}`));
     process.exit(1);
   }
 }
