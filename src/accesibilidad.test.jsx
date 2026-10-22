@@ -335,3 +335,167 @@ describe('diálogos', () => {
     expect(salir).toHaveFocus() // el foco vuelve a "Salir"
   })
 })
+
+const TURNO_DEMO = { id: 1, medicoId: 10, medico: 'Dra. Corazón', especialidad: 'Cardiología', fecha: 'Jueves', hora: '10:00 hs' }
+
+describe('mensajes que se anuncian solos', () => {
+  it('error de login: aparece como alerta', async () => {
+    const user = userEvent.setup()
+    api.login.mockRejectedValue(new Error('Credenciales inválidas'))
+    render(<App />)
+    await screen.findByRole('button', { name: 'Iniciar sesión' })
+    await user.type(campo('DNI o Email'), 'ana@correo.com')
+    await user.type(campo('Contraseña'), 'MiClave-2026x')
+    await user.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Credenciales inválidas')
+  })
+
+  it('aviso de cuenta creada (con verificación de email): aparece como estado, no como alerta', async () => {
+    const user = userEvent.setup()
+    api.register.mockResolvedValue({ requiereVerificacion: true, message: 'Te enviamos un email para activar tu cuenta.' })
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Crear una cuenta' }))
+    await user.type(campo('Nombre completo'), 'Ana Gómez')
+    await user.type(campo('DNI'), '30123456')
+    await user.type(campo('Email'), 'ana@correo.com')
+    await user.type(campo('Contraseña'), 'Zorro-Azul-4721')
+    await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Te enviamos un email para activar tu cuenta.')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('la pantalla inicial de carga es un estado', () => {
+    api.refrescarSesion.mockReturnValue(new Promise(() => {}))
+    render(<App />)
+    expect(screen.getByRole('status')).toHaveTextContent('Cargando...')
+  })
+
+  it('cambio de contraseña obligatorio: la confirmación distinta es una alerta', async () => {
+    const user = userEvent.setup()
+    render(<CambioContrasenaObligatorio usuario={{ nombre: 'Dr. House' }} onCambiada={vi.fn()} onLogout={vi.fn()} />)
+    await user.type(screen.getByLabelText(/Contraseña inicial/), 'Inicial-Verde-4482')
+    await user.type(campo('Contraseña nueva'), 'Definitiva-Roja-7741')
+    await user.type(screen.getByLabelText(/Repetí la contraseña nueva/), 'Definitiva-Roja-0000')
+    await user.click(screen.getByRole('button', { name: 'Guardar y continuar' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Las contraseñas no coinciden.')
+  })
+
+  it('perfil: guardar es un estado y un rechazo de la contraseña es una alerta', async () => {
+    const user = userEvent.setup()
+    api.actualizarPerfil.mockResolvedValue({})
+    api.actualizarPerfilPaciente.mockResolvedValue({})
+    api.cambiarContrasena.mockRejectedValue(new Error('La contraseña actual es incorrecta'))
+    render(<PerfilModal usuario={{ id: 1, nombre: 'Ana', rol: 'paciente' }} onClose={vi.fn()} onActualizado={vi.fn()} />)
+    await screen.findByText('Datos personales')
+
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Datos actualizados con éxito.')
+
+    await user.type(campo('Contraseña actual'), 'Equivocada-0000')
+    await user.type(campo('Contraseña nueva'), 'Nueva-Clave-5678')
+    await user.type(campo('Confirmar contraseña'), 'Nueva-Clave-5678')
+    await user.click(screen.getByRole('button', { name: 'Cambiar contraseña' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('La contraseña actual es incorrecta')
+  })
+
+  it('perfil: el error de carga es una alerta', async () => {
+    api.perfil.mockRejectedValue(new Error('Sin conexión'))
+    render(<PerfilModal usuario={{ id: 1, nombre: 'Ana', rol: 'paciente' }} onClose={vi.fn()} onActualizado={vi.fn()} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar tu perfil: Sin conexión')
+  })
+
+  it('alta de especialidad: crear es un estado y un duplicado es una alerta', async () => {
+    const user = userEvent.setup()
+    api.crearEspecialidad.mockResolvedValueOnce({ data: { nombre: 'Neurología' } })
+    api.crearEspecialidad.mockRejectedValueOnce(new Error('Ya existe una especialidad con ese nombre'))
+    render(<AdminAltaModal onClose={vi.fn()} />)
+    await screen.findByText('Cardiología')
+
+    await user.type(campo('Nombre de la especialidad'), 'Neurología')
+    await user.click(screen.getByRole('button', { name: 'Crear especialidad' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Especialidad "Neurología" creada con éxito.')
+
+    await user.type(campo('Nombre de la especialidad'), 'Neurología')
+    await user.click(screen.getByRole('button', { name: 'Crear especialidad' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ya existe una especialidad con ese nombre')
+  })
+
+  it('alta de especialidad: si no carga la lista, es una alerta', async () => {
+    api.especialidades.mockRejectedValue(new Error('Sin conexión'))
+    render(<AdminAltaModal onClose={vi.fn()} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar la lista: Sin conexión')
+  })
+
+  it('edición de médico sin especialidades: el aviso es una alerta', async () => {
+    const user = userEvent.setup()
+    const medico = { idMedico: 10, consultorio: 'A', duracionTurnoMinutos: 30, usuario: { nomYape: 'Dra. Corazón' }, especialidades: [] }
+    render(<EditarMedicoModal medico={medico} onClose={vi.fn()} onActualizado={vi.fn()} />)
+    await screen.findByRole('checkbox', { name: 'Cardiología' })
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('El médico tiene que tener al menos una especialidad.')
+  })
+
+  it('solicitar y reprogramar turno: los errores de carga son alertas', async () => {
+    api.especialidades.mockRejectedValue(new Error('Sin conexión'))
+    const { unmount } = render(<NuevoTurnoModal onClose={vi.fn()} onCreado={vi.fn()} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar la información: Sin conexión')
+    unmount()
+
+    api.disponibilidadDeMedico.mockRejectedValue(new Error('Sin conexión'))
+    render(<ReprogramarTurnoModal turno={TURNO_DEMO} onClose={vi.fn()} onReprogramado={vi.fn()} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar la disponibilidad del médico')
+  })
+
+  it('panel: mientras cargan los turnos es un estado y, si falla, una alerta', async () => {
+    const user = userEvent.setup()
+    api.misTurnos.mockReturnValue(new Promise(() => {}))
+    const { unmount } = render(<Dashboard usuario={{ id: 1, nombre: 'Ana', rol: 'paciente' }} onLogout={vi.fn()} onUsuarioActualizado={vi.fn()} />)
+    expect(await screen.findByRole('status')).toHaveTextContent('Cargando tus turnos...')
+    unmount()
+
+    api.misTurnos.mockRejectedValue(new Error('Sin conexión'))
+    render(<Dashboard usuario={{ id: 1, nombre: 'Ana', rol: 'paciente' }} onLogout={vi.fn()} onUsuarioActualizado={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: /^Mis turnos/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar tus turnos: Sin conexión')
+  })
+
+  it('panel del administrador: el error de turnos y el de médicos son alertas', async () => {
+    const user = userEvent.setup()
+    api.todosLosTurnos.mockRejectedValue(new Error('Sin conexión'))
+    api.todosLosMedicos.mockRejectedValue(new Error('Sin conexión'))
+    render(<Dashboard usuario={{ id: 2, nombre: 'Admin', rol: 'admin' }} onLogout={vi.fn()} onUsuarioActualizado={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: 'Administración' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar los turnos')
+
+    // El aviso de turnos queda arriba en ambas pestañas: en "Médicos" se ven los dos.
+    await user.click(screen.getByRole('button', { name: 'Médicos' }))
+    await vi.waitFor(() => expect(screen.getAllByRole('alert')).toHaveLength(2))
+    const avisos = screen.getAllByRole('alert').map((a) => a.textContent).join(' | ')
+    expect(avisos).toMatch(/No se pudieron cargar los turnos/)
+    expect(avisos).toMatch(/No se pudieron cargar los médicos/)
+  })
+})
+
+// Guardia sobre el código fuente: un cuadro de error o de éxito nuevo que olvide su
+// rol no llega a producción sin que falle este test.
+describe('código fuente', () => {
+  const archivos = Object.entries(
+    import.meta.glob('./*.jsx', { eager: true, query: '?raw', import: 'default' })
+  ).filter(([ruta]) => !ruta.includes('.test.'))
+
+  it('hay componentes que revisar', () => {
+    expect(archivos.length).toBeGreaterThan(5)
+  })
+
+  it.each(archivos)('%s: todo cuadro de error lleva role="alert" y todo cuadro de éxito role="status"', (_ruta, fuente) => {
+    const sinRol = (patron, rol) =>
+      [...fuente.matchAll(new RegExp(`<(?:div|p)\\b[^>]*${patron}[^>]*>`, 'g'))]
+        .map((m) => m[0])
+        .filter((etiqueta) => !etiqueta.includes(`role="${rol}"`))
+
+    expect(sinRol('bg-red-500/10 border border-red-500/30', 'alert')).toEqual([])
+    expect(sinRol('bg-emerald-500/10 border border-emerald-500/30', 'status')).toEqual([])
+  })
+})
