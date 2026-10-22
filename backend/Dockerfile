@@ -13,6 +13,10 @@ RUN npm ci --omit=dev
 
 COPY . .
 
+# No correr como root: si alguien lograra ejecutar código en la app, no
+# tendría control del contenedor. La imagen oficial de Node trae el usuario `node`.
+USER node
+
 EXPOSE 3000
 
 CMD ["node", "src/app.js"]

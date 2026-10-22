@@ -58,7 +58,7 @@ function NuevoTurnoModal({ onClose, onCreado }) {
     setEnviando(true);
     setErrorEnvio('');
     try {
-      await api.crearTurno(medicoId, horaSeleccionada.toISOString());
+      await api.crearTurno(medicoId, horaSeleccionada.toISOString(), especialidadId);
       onCreado();
     } catch (err) {
       setErrorEnvio(err.message);
