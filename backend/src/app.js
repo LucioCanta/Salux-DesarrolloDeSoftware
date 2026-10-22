@@ -1,4 +1,6 @@
-require('dotenv').config({ override: true });
+// En los tests (NODE_ENV=test) el .env NO pisa lo que ya definió test/entorno.js:
+// si lo hiciera, los tests terminarían apuntando a la base de desarrollo.
+require('dotenv').config({ override: process.env.NODE_ENV !== 'test' });
 
 const express = require('express');
 const helmet = require('helmet');

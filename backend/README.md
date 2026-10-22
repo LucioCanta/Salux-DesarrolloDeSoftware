@@ -79,6 +79,30 @@ node crearAdmin.js   # administrador (ADMIN_* del .env)
 node seedDemo.js     # especialidades + médico y paciente de prueba (PRUEBA_* del .env)
 ```
 
+## Tests
+
+Corren con el runner nativo de Node (`node --test`) y `supertest`; no hace falta instalar nada más.
+
+```bash
+cd backend
+npm run test:unit          # sin base de datos (política de contraseñas, fechas, esquemas, emails, validación de entorno)
+npm run test:integration   # la API completa contra PostgreSQL (auth, roles, turnos, especialidades, cron)
+npm test                   # ambos
+```
+
+Los de integración usan una base **aparte**, `salux_test`, para no tocar tus datos. Con el Postgres de
+Docker levantado, se crea una vez:
+
+```bash
+docker exec salux_db_container psql -U postgres -c "create database salux_test owner salux_app"
+```
+
+`npm run test:integration` aplica las migraciones a esa base y borra su contenido en cada archivo de test.
+**Por seguridad se niegan a correr** si la base no es local o su nombre no termina en `_test`
+(nunca van a tocar `salux_db` ni Supabase). Para usar otra base local: `TEST_DATABASE_URL=postgresql://...`.
+
+Los emails no se envían en los tests (sin SMTP solo se registran en consola).
+
 ## Variables de entorno
 
 | Variable | Descripción |
