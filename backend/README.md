@@ -70,6 +70,24 @@ CREATE ROLE salux_app LOGIN PASSWORD 'LA_CONTRASEÑA_DE_DB_APP_PASSWORD' NOSUPER
 ALTER DATABASE salux_db OWNER TO salux_app;
 ```
 
+### Recrear el entorno desde cero
+
+Para empezar de nuevo (o si venís de la versión con MySQL, que ya no se usa):
+
+```bash
+cd backend
+docker compose down -v          # borra los contenedores Y los datos locales
+docker compose up -d --build    # crea la base, el rol de la app, salux_test y aplica las migraciones
+node crearAdmin.js              # administrador (usa ADMIN_* de tu .env)
+node seedDemo.js                # opcional: especialidades, un médico y un paciente de prueba
+```
+
+- Los scripts imprimen a qué base se conectan: tiene que decir `localhost`.
+- En Windows, los scripts `.sh` necesitan finales de línea LF; el repo lo fuerza con `.gitattributes`.
+  Si ves `/bin/sh^M: bad interpreter`, hacé `git pull`, borrá `backend/docker/postgres-init/01-crear-rol-app.sh`,
+  restauralo con `git checkout -- backend/docker/postgres-init/01-crear-rol-app.sh` y repetí los pasos.
+- Los volúmenes viejos de MySQL (`backend_mysql_data`, etc.) ya no se usan; podés borrarlos con `docker volume rm`.
+
 ### Datos de demostración
 
 La base arranca vacía. Para cargar el administrador y datos de prueba:
@@ -90,8 +108,8 @@ npm run test:integration   # la API completa contra PostgreSQL (auth, roles, tur
 npm test                   # ambos
 ```
 
-Los de integración usan una base **aparte**, `salux_test`, para no tocar tus datos. Con el Postgres de
-Docker levantado, se crea una vez:
+Los de integración usan una base **aparte**, `salux_test`, para no tocar tus datos. En una instalación nueva
+del Postgres de Docker se crea sola. Si tu volumen es anterior a este cambio, creala una vez:
 
 ```bash
 docker exec salux_db_container psql -U postgres -c "create database salux_test owner salux_app"
