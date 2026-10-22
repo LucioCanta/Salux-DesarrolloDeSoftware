@@ -180,7 +180,7 @@ function App() {
 
   if (verificandoSesion) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
+      <div role="status" className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
         Cargando...
       </div>
     );
@@ -224,12 +224,12 @@ function App() {
         </div>
 
         {error && (
-          <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+          <div role="alert" className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
             {error}
           </div>
         )}
         {mensaje && (
-          <div className="mb-4 px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">
+          <div role="status" className="mb-4 px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">
             {mensaje}
           </div>
         )}

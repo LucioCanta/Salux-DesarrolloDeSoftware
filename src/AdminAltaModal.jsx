@@ -105,8 +105,8 @@ function FormEspecialidad() {
   return (
     <div className="space-y-5">
       <form onSubmit={enviar} className="space-y-4">
-        {exito && <div className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exito}</div>}
-        {error && <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
+        {exito && <div role="status" className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exito}</div>}
+        {error && <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
         <div>
           <label htmlFor="alta-especialidad-nombre" className={labelClase}>Nombre de la especialidad <span className="text-red-500" aria-hidden="true">*</span></label>
           <input id="alta-especialidad-nombre" type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required placeholder="Ej: Cardiología" className={inputClase} />
@@ -118,8 +118,8 @@ function FormEspecialidad() {
 
       <div>
         <p className={labelClase}>Especialidades existentes</p>
-        {cargandoLista && <p className="text-slate-400 text-sm">Cargando...</p>}
-        {errorLista && !cargandoLista && <p className="text-red-400 text-sm">No se pudo cargar la lista: {errorLista}</p>}
+        {cargandoLista && <p role="status" className="text-slate-400 text-sm">Cargando...</p>}
+        {errorLista && !cargandoLista && <p role="alert" className="text-red-400 text-sm">No se pudo cargar la lista: {errorLista}</p>}
         {!cargandoLista && !errorLista && especialidades.length === 0 && (
           <p className="text-slate-400 text-sm">Todavía no hay ninguna cargada.</p>
         )}
@@ -251,12 +251,12 @@ function FormMedico() {
     }
   };
 
-  if (cargandoEsp) return <p className="text-slate-400 text-sm">Cargando especialidades...</p>;
+  if (cargandoEsp) return <p role="status" className="text-slate-400 text-sm">Cargando especialidades...</p>;
 
   return (
     <form onSubmit={enviar} className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-      {exito && <div className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exito}</div>}
-      {error && <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
+      {exito && <div role="status" className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exito}</div>}
+      {error && <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
 
       <div className="grid grid-cols-2 gap-3">
         <div>

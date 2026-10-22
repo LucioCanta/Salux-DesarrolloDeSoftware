@@ -41,7 +41,7 @@ function CambioContrasenaObligatorio({ usuario, onCambiada, onLogout }) {
           </p>
         </div>
 
-        {error && <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
+        {error && <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
 
         <div>
           <label htmlFor="cambio-contrasena-actual" className={labelClase}>Contraseña inicial (la que te dieron)</label>

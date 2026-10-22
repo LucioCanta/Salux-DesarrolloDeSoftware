@@ -833,7 +833,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
         // ==========================================
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           {errorAdmin && !cargandoAdmin && (
-            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
               No se pudieron cargar los turnos: {errorAdmin}
             </div>
           )}
@@ -943,7 +943,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           </p>
 
           {cargandoAdmin && (
-            <div className="text-slate-400 text-sm py-4">Cargando turnos...</div>
+            <div role="status" className="text-slate-400 text-sm py-4">Cargando turnos...</div>
           )}
 
           {/* Listado de turnos de todos los pacientes */}
@@ -1020,13 +1020,13 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           {tabAdmin === 'medicos' && (
             <>
               {errorMedicosAdmin && !cargandoMedicosAdmin && (
-                <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
                   No se pudieron cargar los médicos: {errorMedicosAdmin}
                 </div>
               )}
 
               {cargandoMedicosAdmin && (
-                <div className="text-slate-400 text-sm py-4">Cargando médicos...</div>
+                <div role="status" className="text-slate-400 text-sm py-4">Cargando médicos...</div>
               )}
 
               {!cargandoMedicosAdmin && !errorMedicosAdmin && medicosAdmin.length === 0 && (
@@ -1145,11 +1145,11 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           </div>
 
           {cargandoAgenda && (
-            <div className="text-slate-400 text-sm py-4">Cargando tu agenda...</div>
+            <div role="status" className="text-slate-400 text-sm py-4">Cargando tu agenda...</div>
           )}
 
           {errorAgenda && !cargandoAgenda && (
-            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
               No se pudo cargar tu agenda: {errorAgenda}
             </div>
           )}
@@ -1247,7 +1247,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
 
           <form onSubmit={agregarDisponibilidad} className={`p-5 rounded-xl border space-y-4 ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800'}`}>
             {errorNuevaDisponibilidad && (
-              <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+              <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
                 {errorNuevaDisponibilidad}
               </div>
             )}
@@ -1295,11 +1295,11 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           </form>
 
           {cargandoDisponibilidad && (
-            <div className="text-slate-400 text-sm py-4">Cargando tu disponibilidad...</div>
+            <div role="status" className="text-slate-400 text-sm py-4">Cargando tu disponibilidad...</div>
           )}
 
           {errorDisponibilidad && !cargandoDisponibilidad && (
-            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
               No se pudo cargar tu disponibilidad: {errorDisponibilidad}
             </div>
           )}
@@ -1340,7 +1340,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
 
             <form onSubmit={agregarAusencia} className={`p-5 rounded-xl border space-y-4 ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800'}`}>
               {errorNuevaAusencia && (
-                <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
                   {errorNuevaAusencia}
                 </div>
               )}
@@ -1387,11 +1387,11 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             </form>
 
             {cargandoAusencias && (
-              <div className="text-slate-400 text-sm py-4">Cargando tus ausencias...</div>
+              <div role="status" className="text-slate-400 text-sm py-4">Cargando tus ausencias...</div>
             )}
 
             {errorAusencias && !cargandoAusencias && (
-              <div className="mt-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+              <div role="alert" className="mt-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
                 No se pudieron cargar tus ausencias: {errorAusencias}
               </div>
             )}
@@ -1456,11 +1456,11 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           </div>
 
           {cargandoTurnos && (
-            <div className="text-slate-400 text-sm py-4">Cargando tus turnos...</div>
+            <div role="status" className="text-slate-400 text-sm py-4">Cargando tus turnos...</div>
           )}
 
           {errorTurnos && !cargandoTurnos && (
-            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
               No se pudieron cargar tus turnos: {errorTurnos}
             </div>
           )}
@@ -1559,11 +1559,11 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           </div>
 
           {cargandoTurnos && (
-            <div className="text-slate-400 text-sm py-4">Cargando tu historial...</div>
+            <div role="status" className="text-slate-400 text-sm py-4">Cargando tu historial...</div>
           )}
 
           {errorTurnos && !cargandoTurnos && (
-            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
               No se pudo cargar tu historial: {errorTurnos}
             </div>
           )}
@@ -1623,7 +1623,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           )}
 
           {esPaciente && cargandoTurnos && (
-            <div className="text-slate-400 text-sm">Cargando tus turnos...</div>
+            <div role="status" className="text-slate-400 text-sm">Cargando tus turnos...</div>
           )}
 
           {esPaciente && proximoTurno && (

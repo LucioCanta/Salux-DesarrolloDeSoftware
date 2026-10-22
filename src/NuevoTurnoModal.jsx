@@ -78,10 +78,10 @@ function NuevoTurnoModal({ onClose, onCreado }) {
         </div>
 
         <div className="px-6 py-5 space-y-5">
-          {cargandoDatos && <p className="text-slate-400 text-sm">Cargando especialidades y médicos...</p>}
+          {cargandoDatos && <p role="status" className="text-slate-400 text-sm">Cargando especialidades y médicos...</p>}
 
           {errorCarga && !cargandoDatos && (
-            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
               No se pudo cargar la información: {errorCarga}
             </div>
           )}
@@ -211,7 +211,7 @@ function NuevoTurnoModal({ onClose, onCreado }) {
               )}
 
               {errorEnvio && (
-                <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
                   {errorEnvio}
                 </div>
               )}

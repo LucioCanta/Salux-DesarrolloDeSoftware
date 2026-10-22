@@ -58,10 +58,10 @@ function ReprogramarTurnoModal({ turno, onClose, onReprogramado }) {
             <p className="text-slate-500 text-xs mt-1">Turno actual: {turno.fecha} — {turno.hora}</p>
           </div>
 
-          {cargandoDisponibilidad && <p className="text-slate-400 text-sm">Cargando horarios disponibles...</p>}
+          {cargandoDisponibilidad && <p role="status" className="text-slate-400 text-sm">Cargando horarios disponibles...</p>}
 
           {errorCarga && !cargandoDisponibilidad && (
-            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
               No se pudo cargar la disponibilidad del médico: {errorCarga}
             </div>
           )}
@@ -133,7 +133,7 @@ function ReprogramarTurnoModal({ turno, onClose, onReprogramado }) {
               )}
 
               {errorEnvio && (
-                <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
                   {errorEnvio}
                 </div>
               )}

@@ -92,10 +92,10 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
         </div>
 
         <div className="px-6 py-5 space-y-6 overflow-y-auto">
-          {cargando && <p className="text-slate-400 text-sm">Cargando tu perfil...</p>}
+          {cargando && <p role="status" className="text-slate-400 text-sm">Cargando tu perfil...</p>}
 
           {errorCarga && !cargando && (
-            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
               No se pudo cargar tu perfil: {errorCarga}
             </div>
           )}
@@ -110,8 +110,8 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
                   </span>
                 </div>
 
-                {exitoDatos && <div className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exitoDatos}</div>}
-                {errorDatos && <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{errorDatos}</div>}
+                {exitoDatos && <div role="status" className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exitoDatos}</div>}
+                {errorDatos && <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{errorDatos}</div>}
 
                 <div>
                   <label htmlFor="perfil-nombre-completo" className={labelClase}>Nombre completo</label>
@@ -164,8 +164,8 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
                 <form onSubmit={cambiarPassword} className="space-y-4">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Cambiar contraseña</p>
 
-                  {exitoPassword && <div className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exitoPassword}</div>}
-                  {errorPassword && <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{errorPassword}</div>}
+                  {exitoPassword && <div role="status" className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exitoPassword}</div>}
+                  {errorPassword && <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{errorPassword}</div>}
 
                   <div>
                     <label htmlFor="perfil-contrasena-actual" className={labelClase}>Contraseña actual</label>
