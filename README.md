@@ -20,6 +20,17 @@ node crearAdmin.js && node seedDemo.js      # administrador y datos de demostrac
 cd .. && npm install && npm run dev          # http://localhost:5173
 ```
 
+## Tests
+
+```bash
+npm test                      # frontend: pantallas y cliente de la API (Vitest + Testing Library), sin red ni base de datos
+npm run test:coverage         # ídem, con informe de cobertura en coverage/
+cd backend && npm test        # backend: unitarios + integración contra PostgreSQL (ver backend/README.md)
+```
+
+Los tests del frontend corren siempre en hora de Argentina (los horarios de los turnos se piensan en esa zona).
+Todo corre en GitHub Actions en cada pull request.
+
 ## Publicar en internet
 
 Seguí [`DEPLOY.md`](DEPLOY.md): base de datos en Supabase, app en Vercel y emails con Brevo.
