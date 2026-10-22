@@ -7,4 +7,6 @@ set -e
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
   CREATE ROLE "$DB_APP_USER" LOGIN PASSWORD '$DB_APP_PASSWORD' NOSUPERUSER NOCREATEROLE CREATEDB;
   ALTER DATABASE "$POSTGRES_DB" OWNER TO "$DB_APP_USER";
+  -- Base aparte para los tests automáticos (npm test en backend/): nunca tocan salux_db.
+  CREATE DATABASE salux_test OWNER "$DB_APP_USER";
 EOSQL
