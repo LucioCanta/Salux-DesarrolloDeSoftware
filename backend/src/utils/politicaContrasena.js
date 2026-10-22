@@ -19,8 +19,9 @@ const COMUNES = new Set([
   '1234567890', '12345678', '123456789', '0123456789', '1q2w3e4r', '1q2w3e4r5t', 'q1w2e3r4',
 ]);
 
+// Minúsculas y sin tildes: "Pérez" en el nombre tiene que detectar "Perez" en la clave.
 function normalizar(texto) {
-  return String(texto || '').toLowerCase();
+  return String(texto || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
 // Devuelve la lista de problemas de una contraseña (vacía si es aceptable).
