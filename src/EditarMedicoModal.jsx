@@ -67,16 +67,16 @@ function EditarMedicoModal({ medico, onClose, onActualizado }) {
           {error && <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
 
           <div>
-            <label className={labelClase}>Consultorio</label>
+            <label htmlFor="editar-medico-consultorio" className={labelClase}>Consultorio</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm pointer-events-none">Cons.</span>
-              <input type="text" value={consultorio} onChange={(e) => setConsultorio(e.target.value)} placeholder="204" maxLength={10} className={`${inputClase} pl-14`} />
+              <input id="editar-medico-consultorio" type="text" value={consultorio} onChange={(e) => setConsultorio(e.target.value)} placeholder="204" maxLength={10} className={`${inputClase} pl-14`} />
             </div>
           </div>
 
           <div>
-            <label className={labelClase}>Duración del turno (minutos)</label>
-            <input type="number" value={duracionTurnoMinutos} onChange={(e) => setDuracionTurnoMinutos(e.target.value)} min={5} max={240} step={5} className={inputClase} />
+            <label htmlFor="editar-medico-duracion" className={labelClase}>Duración del turno (minutos)</label>
+            <input id="editar-medico-duracion" type="number" value={duracionTurnoMinutos} onChange={(e) => setDuracionTurnoMinutos(e.target.value)} min={5} max={240} step={5} className={inputClase} />
           </div>
 
           <div>

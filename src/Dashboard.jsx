@@ -1252,8 +1252,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             )}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Día</label>
-                <select
+                <label htmlFor="disponibilidad-dia" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Día</label>
+                <select id="disponibilidad-dia"
                   value={nuevaDia}
                   onChange={(e) => setNuevaDia(e.target.value)}
                   className={`w-full px-3 py-2.5 rounded-lg border ${altoContraste ? 'bg-white border-black text-black' : 'bg-slate-950 border-slate-700 text-slate-200'}`}
@@ -1264,8 +1264,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Desde</label>
-                <input
+                <label htmlFor="disponibilidad-desde" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Desde</label>
+                <input id="disponibilidad-desde"
                   type="time"
                   value={nuevaHoraInicio}
                   onChange={(e) => setNuevaHoraInicio(e.target.value)}
@@ -1273,8 +1273,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Hasta</label>
-                <input
+                <label htmlFor="disponibilidad-hasta" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Hasta</label>
+                <input id="disponibilidad-hasta"
                   type="time"
                   value={nuevaHoraFin}
                   onChange={(e) => setNuevaHoraFin(e.target.value)}
@@ -1345,8 +1345,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Desde</label>
-                  <input
+                  <label htmlFor="ausencia-desde" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Desde</label>
+                  <input id="ausencia-desde"
                     type="date"
                     value={nuevaAusenciaDesde}
                     onChange={(e) => setNuevaAusenciaDesde(e.target.value)}
@@ -1355,8 +1355,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Hasta</label>
-                  <input
+                  <label htmlFor="ausencia-hasta" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Hasta</label>
+                  <input id="ausencia-hasta"
                     type="date"
                     value={nuevaAusenciaHasta}
                     onChange={(e) => setNuevaAusenciaHasta(e.target.value)}
@@ -1365,8 +1365,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Motivo (opcional)</label>
-                  <input
+                  <label htmlFor="ausencia-motivo" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Motivo (opcional)</label>
+                  <input id="ausencia-motivo"
                     type="text"
                     value={nuevaAusenciaMotivo}
                     onChange={(e) => setNuevaAusenciaMotivo(e.target.value)}

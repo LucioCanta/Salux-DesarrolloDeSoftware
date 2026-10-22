@@ -44,17 +44,17 @@ function CambioContrasenaObligatorio({ usuario, onCambiada, onLogout }) {
         {error && <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
 
         <div>
-          <label className={labelClase}>Contraseña inicial (la que te dieron)</label>
-          <input type="password" value={actual} onChange={(e) => setActual(e.target.value)} required autoComplete="current-password" className={inputClase} />
+          <label htmlFor="cambio-contrasena-actual" className={labelClase}>Contraseña inicial (la que te dieron)</label>
+          <input id="cambio-contrasena-actual" type="password" value={actual} onChange={(e) => setActual(e.target.value)} required autoComplete="current-password" className={inputClase} />
         </div>
         <div>
-          <label className={labelClase}>Contraseña nueva</label>
-          <input type="password" value={nueva} onChange={(e) => setNueva(e.target.value)} required minLength={10} autoComplete="new-password" placeholder="Mínimo 10 caracteres" className={inputClase} />
+          <label htmlFor="cambio-contrasena-nueva" className={labelClase}>Contraseña nueva</label>
+          <input id="cambio-contrasena-nueva" type="password" value={nueva} onChange={(e) => setNueva(e.target.value)} required minLength={10} autoComplete="new-password" placeholder="Mínimo 10 caracteres" className={inputClase} />
           <p className="text-slate-500 text-xs mt-1">Mínimo 10 caracteres, con letras y números. No uses una contraseña común ni tus datos personales.</p>
         </div>
         <div>
-          <label className={labelClase}>Repetí la contraseña nueva</label>
-          <input type="password" value={confirmar} onChange={(e) => setConfirmar(e.target.value)} required minLength={10} autoComplete="new-password" className={inputClase} />
+          <label htmlFor="cambio-confirmar-contrasena" className={labelClase}>Repetí la contraseña nueva</label>
+          <input id="cambio-confirmar-contrasena" type="password" value={confirmar} onChange={(e) => setConfirmar(e.target.value)} required minLength={10} autoComplete="new-password" className={inputClase} />
         </div>
 
         <button type="submit" disabled={enviando} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition">
