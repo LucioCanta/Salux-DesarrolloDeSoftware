@@ -262,7 +262,7 @@ describe('paciente', () => {
     const user = userEvent.setup()
     montar(PACIENTE)
     await screen.findByText(/Recordatorio/)
-    await user.click(screen.getByRole('button', { name: '×' }))
+    await user.click(screen.getByRole('button', { name: 'Cerrar recordatorio' }))
     expect(screen.queryByText(/Recordatorio/)).not.toBeInTheDocument()
   })
 })

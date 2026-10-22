@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { api } from './api';
+import { useDialogo } from './useDialogo';
 import { DIAS_A_MOSTRAR, generarProximosDias, generarHorariosDelDia } from './turnoUtils';
 
 function NuevoTurnoModal({ onClose, onCreado }) {
+  const { ref, tituloId } = useDialogo(onClose);
   const [paso, setPaso] = useState(1);
   const [cargandoDatos, setCargandoDatos] = useState(true);
   const [errorCarga, setErrorCarga] = useState('');
@@ -69,10 +71,10 @@ function NuevoTurnoModal({ onClose, onCreado }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg text-slate-100 overflow-hidden">
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg text-slate-100 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-          <h2 className="font-bold text-lg">Solicitar turno</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 text-xl leading-none">&times;</button>
+          <h2 id={tituloId} className="font-bold text-lg">Solicitar turno</h2>
+          <button onClick={onClose} aria-label="Cerrar" className="text-slate-400 hover:text-slate-200 text-xl leading-none">&times;</button>
         </div>
 
         <div className="px-6 py-5 space-y-5">

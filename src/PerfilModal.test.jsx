@@ -56,10 +56,10 @@ describe('carga del perfil', () => {
     expect(screen.queryByText('Datos personales')).not.toBeInTheDocument()
   })
 
-  it('el botón × cierra el modal', async () => {
+  it('el botón Cerrar cierra el modal', async () => {
     const user = userEvent.setup()
     const { onClose } = await montar()
-    await user.click(screen.getByRole('button', { name: '×' }))
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }))
     expect(onClose).toHaveBeenCalled()
   })
 })

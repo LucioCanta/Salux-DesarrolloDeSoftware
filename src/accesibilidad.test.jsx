@@ -14,7 +14,7 @@ vi.mock('./api', () => ({
     actualizarPerfilPaciente: vi.fn(), logoutTodas: vi.fn(), especialidades: vi.fn(), actualizarMedico: vi.fn(),
     crearEspecialidad: vi.fn(), eliminarEspecialidad: vi.fn(), crearMedico: vi.fn(),
     misTurnos: vi.fn(), todosLosTurnos: vi.fn(), todosLosMedicos: vi.fn(), agendaMedico: vi.fn(),
-    misDisponibilidades: vi.fn(), misAusencias: vi.fn(),
+    misDisponibilidades: vi.fn(), misAusencias: vi.fn(), medicos: vi.fn(), disponibilidadDeMedico: vi.fn(),
   },
   getUsuarioGuardado: vi.fn(),
   guardarSesion: vi.fn(),
@@ -30,6 +30,8 @@ import PerfilModal from './PerfilModal'
 import EditarMedicoModal from './EditarMedicoModal'
 import AdminAltaModal from './AdminAltaModal'
 import Dashboard from './Dashboard'
+import NuevoTurnoModal from './NuevoTurnoModal'
+import ReprogramarTurnoModal from './ReprogramarTurnoModal'
 import { api, getUsuarioGuardado, getPreferenciasAccesibilidad } from './api'
 
 // Busca un campo por su etiqueta. El "*" de obligatorio está oculto para los lectores
@@ -46,6 +48,12 @@ function exigirNombresAccesibles(contenedor = document.body) {
   for (const etiqueta of contenedor.querySelectorAll('label[for]')) {
     const destino = contenedor.querySelector(`[id="${etiqueta.getAttribute('for')}"]`)
     expect(destino, `el label "${etiqueta.textContent}" apunta a #${etiqueta.getAttribute('for')}, que no existe`).not.toBeNull()
+  }
+  // Los textos de ayuda enlazados a un campo tienen que existir.
+  for (const campo of contenedor.querySelectorAll('[aria-describedby]')) {
+    for (const id of campo.getAttribute('aria-describedby').split(/\s+/)) {
+      expect(contenedor.querySelector(`[id="${id}"]`), `aria-describedby="${id}" no existe`).not.toBeNull()
+    }
   }
 }
 
@@ -68,6 +76,8 @@ beforeEach(() => {
   api.agendaMedico.mockResolvedValue({ data: [] })
   api.misDisponibilidades.mockResolvedValue({ data: [] })
   api.misAusencias.mockResolvedValue({ data: [] })
+  api.medicos.mockResolvedValue({ data: [] })
+  api.disponibilidadDeMedico.mockResolvedValue({ data: { disponibilidades: [], ausencias: [] } })
 })
 
 describe('pantalla de acceso', () => {
@@ -225,5 +235,103 @@ describe('panel principal', () => {
     expect(campo('Motivo (opcional)')).toBeInTheDocument()
     expect(screen.getAllByLabelText('Desde')).toHaveLength(2)
     expect(screen.getAllByLabelText('Hasta')).toHaveLength(2)
+  })
+})
+
+describe('textos de ayuda', () => {
+  it('los requisitos de contraseña se anuncian junto al campo', async () => {
+    render(<CambioContrasenaObligatorio usuario={{ nombre: 'Dr. House' }} onCambiada={vi.fn()} onLogout={vi.fn()} />)
+    expect(campo('Contraseña nueva')).toHaveAccessibleDescription(/Mínimo 10 caracteres, con letras y números/)
+  })
+
+  it('en el alta de médico, la contraseña, el consultorio y la duración tienen su ayuda', async () => {
+    const user = userEvent.setup()
+    render(<AdminAltaModal onClose={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: 'Médico' }))
+    await screen.findByRole('button', { name: 'Crear médico' })
+
+    expect(campo('Contraseña inicial')).toHaveAccessibleDescription(/tener que cambiarla en su primer ingreso/)
+    expect(campo('Consultorio')).toHaveAccessibleDescription(/no escribas la palabra/)
+    expect(campo('Duración del turno (minutos)')).toHaveAccessibleDescription(/Cuánto dura cada turno/)
+  })
+
+  it('en la pantalla de nueva contraseña también', async () => {
+    window.history.pushState({}, '', '/?reset=TOKEN')
+    render(<App />)
+    await screen.findByRole('button', { name: 'Guardar contraseña nueva' })
+    expect(campo('Contraseña nueva')).toHaveAccessibleDescription(/sin contraseñas comunes/)
+  })
+})
+
+describe('diálogos', () => {
+  const TURNO = { id: 1, medicoId: 10, medico: 'Dra. Corazón', especialidad: 'Cardiología', fecha: 'Jueves', hora: '10:00 hs' }
+  const MEDICO = { idMedico: 10, consultorio: 'A', duracionTurnoMinutos: 30, usuario: { nomYape: 'Dra. Corazón' }, especialidades: [] }
+
+  // Cada modal: [cómo montarlo, nombre del diálogo, esperar a que cargue]
+  const casos = [
+    ['solicitar turno', (onClose) => <NuevoTurnoModal onClose={onClose} onCreado={vi.fn()} />, 'Solicitar turno'],
+    ['reprogramar turno', (onClose) => <ReprogramarTurnoModal turno={TURNO} onClose={onClose} onReprogramado={vi.fn()} />, 'Reprogramar turno'],
+    ['perfil', (onClose) => <PerfilModal usuario={{ id: 1, nombre: 'Ana', rol: 'paciente' }} onClose={onClose} onActualizado={vi.fn()} />, 'Mi perfil'],
+    ['edición de médico', (onClose) => <EditarMedicoModal medico={MEDICO} onClose={onClose} onActualizado={vi.fn()} />, 'Editar médico'],
+    ['alta de especialidades y médicos', (onClose) => <AdminAltaModal onClose={onClose} />, 'Agregar al sistema'],
+  ]
+
+  it.each(casos)('%s es un diálogo modal con nombre, recibe el foco y se cierra con Escape', async (_nombre, montar, titulo) => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(montar(onClose))
+
+    const dialogo = await screen.findByRole('dialog', { name: titulo })
+    expect(dialogo).toHaveAttribute('aria-modal', 'true')
+    expect(dialogo).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Cerrar' })).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('el foco queda dentro del modal aunque se siga tabulando', async () => {
+    const user = userEvent.setup()
+    render(<PerfilModal usuario={{ id: 1, nombre: 'Ana', rol: 'paciente' }} onClose={vi.fn()} onActualizado={vi.fn()} />)
+    const dialogo = await screen.findByRole('dialog', { name: 'Mi perfil' })
+    await screen.findByText('Datos personales')
+
+    for (let i = 0; i < 25; i += 1) {
+      await user.tab()
+      expect(dialogo.contains(document.activeElement)).toBe(true)
+    }
+  })
+
+  it('confirmar el borrado de una especialidad es un diálogo encima del modal de alta: Escape cierra solo ese', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(<AdminAltaModal onClose={onClose} />)
+    await user.click((await screen.findByText('Cardiología')).closest('li').querySelector('button'))
+
+    const confirmacion = screen.getByRole('dialog', { name: '¿Eliminar "Cardiología"?' })
+    expect(confirmacion).toHaveFocus()
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('dialog', { name: '¿Eliminar "Cardiología"?' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Agregar al sistema' })).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('"¿Cancelar este turno?" y "¿Cerrar sesión?" son diálogos de alerta que Escape descarta', async () => {
+    const user = userEvent.setup()
+    api.misTurnos.mockResolvedValue({ data: [] })
+    const onLogout = vi.fn()
+    render(<Dashboard usuario={{ id: 1, nombre: 'Ana Gómez', rol: 'paciente' }} onLogout={onLogout} onUsuarioActualizado={vi.fn()} />)
+
+    const salir = await screen.findByRole('button', { name: 'Salir' })
+    await user.click(salir)
+    const alerta = screen.getByRole('alertdialog', { name: '¿Cerrar sesión?' })
+    expect(alerta).toHaveFocus()
+    expect(alerta).toHaveAttribute('aria-modal', 'true')
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(onLogout).not.toHaveBeenCalled()
+    expect(salir).toHaveFocus() // el foco vuelve a "Salir"
   })
 })
