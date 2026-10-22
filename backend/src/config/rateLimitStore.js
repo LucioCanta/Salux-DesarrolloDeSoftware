@@ -50,13 +50,57 @@ class RedisRateLimitStore {
   }
 }
 
+// Store en la base de datos (Postgres): un upsert atómico por petición. Sirve
+// donde no hay Redis ni memoria compartida (Vercel). Cuesta un viaje a la base
+// por petición limitada, por eso solo se usa en los endpoints de autenticación.
+class DbRateLimitStore {
+  constructor(prefijo) {
+    this.prefijo = `${prefijo}:`;
+    this.prisma = require('./prisma');
+  }
+
+  init(options) {
+    this.windowSegundos = options.windowMs / 1000;
+  }
+
+  async increment(key) {
+    const clave = this.prefijo + key;
+    const filas = await this.prisma.$queryRaw`
+      INSERT INTO "RateLimitContador" ("clave", "hits", "expiraEn")
+      VALUES (${clave}, 1, NOW() + make_interval(secs => ${this.windowSegundos}::double precision))
+      ON CONFLICT ("clave") DO UPDATE SET
+        "hits" = CASE WHEN "RateLimitContador"."expiraEn" < NOW() THEN 1 ELSE "RateLimitContador"."hits" + 1 END,
+        "expiraEn" = CASE WHEN "RateLimitContador"."expiraEn" < NOW()
+                          THEN NOW() + make_interval(secs => ${this.windowSegundos}::double precision)
+                          ELSE "RateLimitContador"."expiraEn" END
+      RETURNING "hits", "expiraEn"`;
+    return { totalHits: Number(filas[0].hits), resetTime: new Date(filas[0].expiraEn) };
+  }
+
+  async decrement(key) {
+    await this.prisma.$executeRaw`
+      UPDATE "RateLimitContador" SET "hits" = GREATEST("hits" - 1, 0) WHERE "clave" = ${this.prefijo + key}`;
+  }
+
+  async resetKey(key) {
+    await this.prisma.$executeRaw`DELETE FROM "RateLimitContador" WHERE "clave" = ${this.prefijo + key}`;
+  }
+}
+
 // Devuelve las opciones de store para un limiter: {} (memoria, el default de
 // express-rate-limit) o el store de Redis con un prefijo propio. Si Redis se
 // cae, el limiter deja pasar las peticiones (y lo loguea) en vez de tumbar la API.
 function opcionesDeStore(prefijo) {
   const client = obtenerClienteRedis();
-  if (!client) return {};
-  return { store: new RedisRateLimitStore(client, prefijo), passOnStoreError: true };
+  if (client) return { store: new RedisRateLimitStore(client, prefijo), passOnStoreError: true };
+  // RATE_LIMIT_STORE=db: contadores en Postgres. El límite GENERAL de la API
+  // ('api', 300 por 15 min) queda en memoria: cada petición pagaría un viaje a
+  // la base y sirve solo como red de contención; lo que protege las cuentas son
+  // los límites de autenticación, que sí usan la base.
+  if (process.env.RATE_LIMIT_STORE === 'db' && prefijo !== 'api') {
+    return { store: new DbRateLimitStore(prefijo), passOnStoreError: true };
+  }
+  return {};
 }
 
 module.exports = { opcionesDeStore };

@@ -5,11 +5,10 @@ const crearEspecialidad = async (req, res) => {
     const { nombre } = req.body;
 
     // Comparación case-insensitive: "Cardiología" y "cardiología" son la misma
-    // especialidad para el negocio, aunque MySQL con collation *_ci ya las
-    // trataría como iguales a nivel de índice único; lo dejamos explícito acá
-    // para dar un mensaje claro sin depender de la collation de la columna.
+    // especialidad para el negocio. PostgreSQL distingue mayúsculas, así que se
+    // pide explícito (hay además un índice único sobre lower(nombre)).
     const existente = await prisma.especialidad.findFirst({
-      where: { nombre: { equals: nombre } }
+      where: { nombre: { equals: nombre, mode: 'insensitive' } }
     });
 
     if (existente && existente.activo) {

@@ -1,5 +1,17 @@
 const nodemailer = require('nodemailer');
 
+// En Vercel la función se congela apenas se envía la respuesta: un mail "en
+// segundo plano" se perdería. waitUntil mantiene viva la invocación hasta que
+// termine el envío. Fuera de Vercel no hace falta (el proceso sigue corriendo).
+let waitUntil = null;
+if (process.env.VERCEL) {
+  try {
+    ({ waitUntil } = require('@vercel/functions'));
+  } catch {
+    // sin el paquete: se envía igual, pero sin garantía de terminar
+  }
+}
+
 // El transporter se arma una sola vez, la primera vez que hace falta.
 let transporter;
 let intentado = false;
@@ -55,7 +67,13 @@ function layoutBase(titulo, cuerpoHtml) {
 // Envía un email; si SMTP no está configurado, o si el envío falla, solo lo
 // registra en consola — nunca debe tirar abajo la operación que lo dispara
 // (crear un turno, pedir un reset de contraseña, etc.).
-async function enviarEmail({ to, subject, html }) {
+function enviarEmail(datos) {
+  const envio = enviarEmailAhora(datos);
+  if (waitUntil) waitUntil(envio);
+  return envio;
+}
+
+async function enviarEmailAhora({ to, subject, html }) {
   const t = obtenerTransporter();
   if (!t) {
     console.log(`[email] SMTP no configurado — se omite el envío a ${to}: "${subject}"`);

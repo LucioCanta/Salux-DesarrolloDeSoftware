@@ -20,9 +20,12 @@ function validarEntorno(env = process.env) {
   if (!env.DATABASE_URL) errores.push('Falta DATABASE_URL');
 
   if (produccion) {
-    // La app no debe conectarse a la base como root
-    if (/^mysql:\/\/root[:@]/i.test(env.DATABASE_URL || '')) {
-      errores.push('DATABASE_URL usa el usuario root: creá un usuario con permisos solo sobre la base de la app');
+    // La app no debería conectarse con el superusuario de la base
+    if (/^postgres(ql)?:\/\/postgres[.:@]/i.test(env.DATABASE_URL || '')) {
+      avisos.push('DATABASE_URL usa el usuario "postgres" (superusuario): conviene un rol propio de la app (ver DEPLOY.md)');
+    }
+    if (!/^postgres(ql)?:\/\//i.test(env.DATABASE_URL || '')) {
+      errores.push('DATABASE_URL tiene que ser una conexión PostgreSQL (postgresql://...)');
     }
     const origenes = (env.CORS_ORIGIN || '').split(',').map((o) => o.trim()).filter(Boolean);
     if (origenes.length === 0) errores.push('Falta CORS_ORIGIN (URL del frontend)');
@@ -36,7 +39,12 @@ function validarEntorno(env = process.env) {
       avisos.push('REQUIERE_VERIFICACION_EMAIL no es "true": el registro revela qué emails/DNI ya existen');
     }
     if (!env.SMTP_HOST) avisos.push('SMTP no configurado: no saldrán los emails (reseteo de contraseña, verificación, turnos)');
-    if (!env.REDIS_URL) avisos.push('REDIS_URL no configurado: los límites de intentos son por instancia y se pierden al reiniciar');
+    if (!env.REDIS_URL && env.RATE_LIMIT_STORE !== 'db') {
+      avisos.push('Sin REDIS_URL ni RATE_LIMIT_STORE=db: los límites de intentos son por instancia y no sirven en serverless');
+    }
+    if (env.VERCEL && !env.CRON_SECRET) {
+      avisos.push('Falta CRON_SECRET: la tarea diaria de mantenimiento (/api/cron/mantenimiento) queda deshabilitada');
+    }
   }
 
   return { errores, avisos };
