@@ -239,10 +239,10 @@ function App() {
           <form className={`space-y-4 ${modoAdultoMayor ? 'space-y-6' : ''}`} onSubmit={handleOlvideContrasena}>
             <p className={`text-slate-400 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>Ingresá el email de tu cuenta y te mandamos un enlace para elegir una contraseña nueva.</p>
             <div>
-              <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
-                Email <span className="text-red-500">*</span>
+              <label htmlFor="acceso-email" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
+                Email <span className="text-red-500" aria-hidden="true">*</span>
               </label>
-              <input
+              <input id="acceso-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -283,10 +283,10 @@ function App() {
         {modo === 'reset' && (
           <form className={`space-y-4 ${modoAdultoMayor ? 'space-y-6' : ''}`} onSubmit={handleResetearContrasena}>
             <div>
-              <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
-                Contraseña nueva <span className="text-red-500">*</span>
+              <label htmlFor="acceso-contrasena-nueva" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
+                Contraseña nueva <span className="text-red-500" aria-hidden="true">*</span>
               </label>
-              <input
+              <input id="acceso-contrasena-nueva"
                 type="password"
                 value={contrasena}
                 onChange={(e) => setContrasena(e.target.value)}
@@ -298,10 +298,10 @@ function App() {
               <p className="text-slate-500 text-xs mt-1">Con letras y números; sin contraseñas comunes ni tus datos.</p>
             </div>
             <div>
-              <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
-                Confirmar contraseña <span className="text-red-500">*</span>
+              <label htmlFor="acceso-confirmar-contrasena" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
+                Confirmar contraseña <span className="text-red-500" aria-hidden="true">*</span>
               </label>
-              <input
+              <input id="acceso-confirmar-contrasena"
                 type="password"
                 value={confirmarContrasena}
                 onChange={(e) => setConfirmarContrasena(e.target.value)}
@@ -336,10 +336,10 @@ function App() {
           {modo === 'registro' && (
             <>
               <div>
-                <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
-                  Nombre completo <span className="text-red-500">*</span>
+                <label htmlFor="acceso-nombre-completo" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
+                  Nombre completo <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
-                <input
+                <input id="acceso-nombre-completo"
                   type="text"
                   value={nomYape}
                   onChange={(e) => setNomYape(e.target.value)}
@@ -349,10 +349,10 @@ function App() {
                 />
               </div>
               <div>
-                <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
-                  DNI <span className="text-red-500">*</span>
+                <label htmlFor="acceso-dni" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
+                  DNI <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
-                <input
+                <input id="acceso-dni"
                   type="text"
                   value={dni}
                   onChange={(e) => setDni(e.target.value)}
@@ -365,10 +365,10 @@ function App() {
           )}
 
           <div>
-            <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
-              {modo === 'login' ? 'DNI o Email' : 'Email'} <span className="text-red-500">*</span>
+            <label htmlFor="acceso-identificador" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
+              {modo === 'login' ? 'DNI o Email' : 'Email'} <span className="text-red-500" aria-hidden="true">*</span>
             </label>
-            <input
+            <input id="acceso-identificador"
               type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -379,11 +379,11 @@ function App() {
           </div>
 
           <div>
-            <label className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
-              Contraseña <span className="text-red-500">*</span>
+            <label htmlFor="acceso-contrasena" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
+              Contraseña <span className="text-red-500" aria-hidden="true">*</span>
             </label>
             <div className="relative">
-              <input
+              <input id="acceso-contrasena"
                 type={mostrarPassword ? "text" : "password"}
                 value={contrasena}
                 onChange={(e) => setContrasena(e.target.value)}
@@ -396,6 +396,8 @@ function App() {
               <button
                 type="button"
                 onClick={() => setMostrarPassword(!mostrarPassword)}
+                aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                aria-pressed={mostrarPassword}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -456,6 +458,9 @@ function App() {
           </span>
           <button
             type="button"
+            role="switch"
+            aria-checked={modoAdultoMayor}
+            aria-label="Modo adulto mayor"
             onClick={() => {
               guardarPreferenciasAccesibilidad({ modoAdultoMayor: !modoAdultoMayor });
               setModoAdultoMayor(!modoAdultoMayor);

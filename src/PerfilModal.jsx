@@ -112,30 +112,30 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
                 {errorDatos && <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{errorDatos}</div>}
 
                 <div>
-                  <label className={labelClase}>Nombre completo</label>
-                  <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required className={inputClase} />
+                  <label htmlFor="perfil-nombre-completo" className={labelClase}>Nombre completo</label>
+                  <input id="perfil-nombre-completo" type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required className={inputClase} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={labelClase}>Email</label>
-                    <input type="text" value={perfil.email} disabled className={inputClase} />
+                    <label htmlFor="perfil-email" className={labelClase}>Email</label>
+                    <input id="perfil-email" type="text" value={perfil.email} disabled className={inputClase} />
                   </div>
                   <div>
-                    <label className={labelClase}>DNI</label>
-                    <input type="text" value={perfil.dni} disabled className={inputClase} />
+                    <label htmlFor="perfil-dni" className={labelClase}>DNI</label>
+                    <input id="perfil-dni" type="text" value={perfil.dni} disabled className={inputClase} />
                   </div>
                 </div>
 
                 {esPaciente && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className={labelClase}>Obra social</label>
-                      <input type="text" value={obraSocial} onChange={(e) => setObraSocial(e.target.value)} placeholder="Ej: OSDE" className={inputClase} />
+                      <label htmlFor="perfil-obra-social" className={labelClase}>Obra social</label>
+                      <input id="perfil-obra-social" type="text" value={obraSocial} onChange={(e) => setObraSocial(e.target.value)} placeholder="Ej: OSDE" className={inputClase} />
                     </div>
                     <div>
-                      <label className={labelClase}>Teléfono</label>
-                      <input type="text" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="Ej: 11-2345-6789" className={inputClase} />
+                      <label htmlFor="perfil-telefono" className={labelClase}>Teléfono</label>
+                      <input id="perfil-telefono" type="text" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="Ej: 11-2345-6789" className={inputClase} />
                     </div>
                   </div>
                 )}
@@ -143,12 +143,12 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
                 {perfil.rol === 'medico' && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className={labelClase}>Matrícula</label>
-                      <input type="text" value={perfil.matricula} disabled className={inputClase} />
+                      <label htmlFor="perfil-matricula" className={labelClase}>Matrícula</label>
+                      <input id="perfil-matricula" type="text" value={perfil.matricula} disabled className={inputClase} />
                     </div>
                     <div>
-                      <label className={labelClase}>Consultorio</label>
-                      <input type="text" value={perfil.consultorio || 'Sin asignar'} disabled className={inputClase} />
+                      <label htmlFor="perfil-consultorio" className={labelClase}>Consultorio</label>
+                      <input id="perfil-consultorio" type="text" value={perfil.consultorio || 'Sin asignar'} disabled className={inputClase} />
                     </div>
                   </div>
                 )}
@@ -166,17 +166,17 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
                   {errorPassword && <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{errorPassword}</div>}
 
                   <div>
-                    <label className={labelClase}>Contraseña actual</label>
-                    <input type="password" value={contrasenaActual} onChange={(e) => setContrasenaActual(e.target.value)} required className={inputClase} />
+                    <label htmlFor="perfil-contrasena-actual" className={labelClase}>Contraseña actual</label>
+                    <input id="perfil-contrasena-actual" type="password" value={contrasenaActual} onChange={(e) => setContrasenaActual(e.target.value)} required className={inputClase} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className={labelClase}>Contraseña nueva</label>
-                      <input type="password" value={contrasenaNueva} onChange={(e) => setContrasenaNueva(e.target.value)} required minLength={10} placeholder="Mínimo 10 caracteres" className={inputClase} />
+                      <label htmlFor="perfil-contrasena-nueva" className={labelClase}>Contraseña nueva</label>
+                      <input id="perfil-contrasena-nueva" type="password" value={contrasenaNueva} onChange={(e) => setContrasenaNueva(e.target.value)} required minLength={10} placeholder="Mínimo 10 caracteres" className={inputClase} />
                     </div>
                     <div>
-                      <label className={labelClase}>Confirmar contraseña</label>
-                      <input type="password" value={confirmarContrasena} onChange={(e) => setConfirmarContrasena(e.target.value)} required minLength={10} className={inputClase} />
+                      <label htmlFor="perfil-confirmar-contrasena" className={labelClase}>Confirmar contraseña</label>
+                      <input id="perfil-confirmar-contrasena" type="password" value={confirmarContrasena} onChange={(e) => setConfirmarContrasena(e.target.value)} required minLength={10} className={inputClase} />
                     </div>
                   </div>
 

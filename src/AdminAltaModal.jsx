@@ -106,8 +106,8 @@ function FormEspecialidad() {
         {exito && <div className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exito}</div>}
         {error && <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
         <div>
-          <label className={labelClase}>Nombre de la especialidad <span className="text-red-500">*</span></label>
-          <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required placeholder="Ej: Cardiología" className={inputClase} />
+          <label htmlFor="alta-especialidad-nombre" className={labelClase}>Nombre de la especialidad <span className="text-red-500" aria-hidden="true">*</span></label>
+          <input id="alta-especialidad-nombre" type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required placeholder="Ej: Cardiología" className={inputClase} />
         </div>
         <button type="submit" disabled={enviando} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition">
           {enviando ? 'Creando...' : 'Crear especialidad'}
@@ -257,39 +257,39 @@ function FormMedico() {
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={labelClase}>Nombre <span className="text-red-500">*</span></label>
-          <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required placeholder="Ana" className={inputClase} />
+          <label htmlFor="alta-medico-nombre" className={labelClase}>Nombre <span className="text-red-500" aria-hidden="true">*</span></label>
+          <input id="alta-medico-nombre" type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required placeholder="Ana" className={inputClase} />
         </div>
         <div>
-          <label className={labelClase}>Apellido <span className="text-red-500">*</span></label>
-          <input type="text" value={apellido} onChange={(e) => setApellido(e.target.value)} required placeholder="Rodríguez" className={inputClase} />
+          <label htmlFor="alta-medico-apellido" className={labelClase}>Apellido <span className="text-red-500" aria-hidden="true">*</span></label>
+          <input id="alta-medico-apellido" type="text" value={apellido} onChange={(e) => setApellido(e.target.value)} required placeholder="Rodríguez" className={inputClase} />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={labelClase}>Email <span className="text-red-500">*</span></label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="medico@salux.com" className={inputClase} />
+          <label htmlFor="alta-medico-email" className={labelClase}>Email <span className="text-red-500" aria-hidden="true">*</span></label>
+          <input id="alta-medico-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="medico@salux.com" className={inputClase} />
         </div>
         <div>
-          <label className={labelClase}>DNI <span className="text-red-500">*</span></label>
-          <input type="text" value={dni} onChange={(e) => setDni(e.target.value)} required placeholder="30456789" className={inputClase} />
+          <label htmlFor="alta-medico-dni" className={labelClase}>DNI <span className="text-red-500" aria-hidden="true">*</span></label>
+          <input id="alta-medico-dni" type="text" value={dni} onChange={(e) => setDni(e.target.value)} required placeholder="30456789" className={inputClase} />
         </div>
       </div>
       <div>
-        <label className={labelClase}>Contraseña inicial <span className="text-red-500">*</span></label>
-        <input type="password" value={contrasena} onChange={(e) => setContrasena(e.target.value)} required minLength={10} placeholder="Mínimo 10 caracteres" className={inputClase} />
+        <label htmlFor="alta-medico-contrasena" className={labelClase}>Contraseña inicial <span className="text-red-500" aria-hidden="true">*</span></label>
+        <input id="alta-medico-contrasena" type="password" value={contrasena} onChange={(e) => setContrasena(e.target.value)} required minLength={10} placeholder="Mínimo 10 caracteres" className={inputClase} />
         <p className="text-slate-500 text-xs mt-1">Con letras y números. El médico va a tener que cambiarla en su primer ingreso.</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={labelClase}>Matrícula <span className="text-red-500">*</span></label>
-          <input type="text" value={matricula} onChange={(e) => setMatricula(e.target.value)} required placeholder="MP-12345" className={inputClase} />
+          <label htmlFor="alta-medico-matricula" className={labelClase}>Matrícula <span className="text-red-500" aria-hidden="true">*</span></label>
+          <input id="alta-medico-matricula" type="text" value={matricula} onChange={(e) => setMatricula(e.target.value)} required placeholder="MP-12345" className={inputClase} />
         </div>
         <div>
-          <label className={labelClase}>Consultorio</label>
+          <label htmlFor="alta-medico-consultorio" className={labelClase}>Consultorio</label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm pointer-events-none">Cons.</span>
-            <input
+            <input id="alta-medico-consultorio"
               type="text"
               value={consultorio}
               onChange={(e) => setConsultorio(e.target.value)}
@@ -303,8 +303,8 @@ function FormMedico() {
       </div>
 
       <div>
-        <label className={labelClase}>Duración del turno (minutos)</label>
-        <input
+        <label htmlFor="alta-medico-duracion" className={labelClase}>Duración del turno (minutos)</label>
+        <input id="alta-medico-duracion"
           type="number"
           value={duracionTurnoMinutos}
           onChange={(e) => setDuracionTurnoMinutos(e.target.value)}
@@ -317,7 +317,7 @@ function FormMedico() {
       </div>
 
       <div>
-        <label className={labelClase}>Especialidades <span className="text-red-500">*</span></label>
+        <label className={labelClase}>Especialidades <span className="text-red-500" aria-hidden="true">*</span></label>
         {especialidades.length === 0 ? (
           <p className="text-slate-400 text-sm">No hay especialidades cargadas. Creá una primero en la otra pestaña.</p>
         ) : (
