@@ -64,6 +64,21 @@ function layoutBase(titulo, cuerpoHtml) {
   `;
 }
 
+// Versión de texto plano del mismo mensaje. Los filtros de spam desconfían de los
+// mails que son solo HTML, y algunos clientes muestran únicamente el texto. Los
+// enlaces se conservan como "etiqueta: url".
+function htmlATexto(html) {
+  return html
+    .replace(/<a\s[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (_, url, etiqueta) => `${etiqueta.replace(/<[^>]+>/g, '').trim()}: ${url}`)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|h2|div)>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+    .split('\n').map((linea) => linea.trim()).join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 // Envía un email; si SMTP no está configurado, o si el envío falla, solo lo
 // registra en consola — nunca debe tirar abajo la operación que lo dispara
 // (crear un turno, pedir un reset de contraseña, etc.).
@@ -80,7 +95,7 @@ async function enviarEmailAhora({ to, subject, html }) {
     return;
   }
   try {
-    const info = await t.sendMail({ from: process.env.EMAIL_FROM || 'Salux <no-reply@salux.local>', to, subject, html });
+    const info = await t.sendMail({ from: process.env.EMAIL_FROM || 'Salux <no-reply@salux.local>', to, subject, html, text: htmlATexto(html) });
     console.log(`[email] Enviado a ${to} — "${subject}" (messageId: ${info.messageId})`);
   } catch (error) {
     console.error('[email] No se pudo enviar el correo:', error.message);
@@ -166,6 +181,7 @@ function emailRegistroDuplicado({ to, nombre }) {
 }
 
 module.exports = {
+  htmlATexto,
   enviarEmail,
   emailVerificacionCuenta,
   emailRegistroDuplicado,

@@ -63,3 +63,17 @@ test('cada plantilla tiene su asunto', async () => {
     ['Tu turno fue confirmado', 'Recuperá tu contraseña de Salux', 'Intento de registro en Salux']
   );
 });
+
+test('cada mail incluye una versión de texto plano con los datos y el enlace', async () => {
+  await email.emailResetContrasena({ to: 'a@b.com', nombre: 'Ana', link: 'https://salux.test/?reset=abc&x=1' });
+  const { text, html } = enviados[0];
+  assert.ok(html.includes('<a '), 'el HTML conserva el botón');
+  assert.ok(!/<[a-z][^>]*>/i.test(text), 'el texto no tiene etiquetas');
+  assert.match(text, /Hola Ana,/);
+  assert.match(text, /Elegir nueva contraseña: https:\/\/salux\.test\/\?reset=abc&x=1/);
+});
+
+test('el texto plano no reintroduce HTML escapado como etiquetas', () => {
+  const texto = email.htmlATexto('<p>Hola &lt;b&gt;Ana&lt;/b&gt; &amp; Co</p>');
+  assert.equal(texto, 'Hola <b>Ana</b> & Co');
+});
