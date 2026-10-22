@@ -286,7 +286,7 @@ function App() {
               <label htmlFor="acceso-contrasena-nueva" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
                 Contraseña nueva <span className="text-red-500" aria-hidden="true">*</span>
               </label>
-              <input id="acceso-contrasena-nueva"
+              <input id="acceso-contrasena-nueva" aria-describedby="acceso-contrasena-nueva-ayuda"
                 type="password"
                 value={contrasena}
                 onChange={(e) => setContrasena(e.target.value)}
@@ -295,7 +295,7 @@ function App() {
                 placeholder="Mínimo 10 caracteres"
                 className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
               />
-              <p className="text-slate-500 text-xs mt-1">Con letras y números; sin contraseñas comunes ni tus datos.</p>
+              <p id="acceso-contrasena-nueva-ayuda" className="text-slate-500 text-xs mt-1">Con letras y números; sin contraseñas comunes ni tus datos.</p>
             </div>
             <div>
               <label htmlFor="acceso-confirmar-contrasena" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>

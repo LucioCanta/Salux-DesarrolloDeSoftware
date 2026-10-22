@@ -66,11 +66,11 @@ describe('paso 1: especialidad', () => {
     expect(await screen.findByText(/No se pudo cargar la información: No se pudo conectar/)).toBeInTheDocument()
   })
 
-  it('el botón × cierra el modal', async () => {
+  it('el botón Cerrar cierra el modal', async () => {
     const user = userEvent.setup()
     const { onClose } = montar()
     await screen.findByRole('button', { name: 'Cardiología' })
-    await user.click(screen.getByRole('button', { name: '×' }))
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }))
     expect(onClose).toHaveBeenCalled()
   })
 })

@@ -5,6 +5,7 @@ import AdminAltaModal from './AdminAltaModal';
 import PerfilModal from './PerfilModal';
 import EditarMedicoModal from './EditarMedicoModal';
 import ReprogramarTurnoModal from './ReprogramarTurnoModal';
+import DialogoConfirmacion from './DialogoConfirmacion';
 
 const ESTADO_TEXTO = { PENDIENTE: 'Pendiente', CONFIRMADO: 'Confirmado', CANCELADO: 'Cancelado', FINALIZADO: 'Finalizado' };
 const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -1617,7 +1618,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               altoContraste ? 'bg-white border-black text-black font-semibold' : 'bg-[#EFF6FF] border-[#2563EB]/30 text-[#2563EB]'
             }`} style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>
               <span>🔔 Recordatorio: tenés un turno en {diasHastaProximo} día{diasHastaProximo === 1 ? '' : 's'} con {proximoTurno.medico}.</span>
-              <button onClick={() => setAlertaActiva(false)} className="font-bold hover:opacity-70" style={{ fontSize: modoAdultoMayor ? '22px' : '18px' }}>&times;</button>
+              <button onClick={() => setAlertaActiva(false)} aria-label="Cerrar recordatorio" className="font-bold hover:opacity-70" style={{ fontSize: modoAdultoMayor ? '22px' : '18px' }}>&times;</button>
             </div>
           )}
 
@@ -1749,52 +1750,28 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
       )}
 
       {confirmacionCancelacion && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm text-slate-100 p-6 space-y-4">
-            <h2 className="font-bold text-lg">¿Cancelar este turno?</h2>
-            <p className="text-slate-400 text-sm">
-              {confirmacionCancelacion.descripcion}.
-              Esta acción no se puede deshacer; si cambiás de idea tendrías que reservar un turno nuevo.
-            </p>
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => setConfirmacionCancelacion(null)}
-                className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 font-medium transition"
-              >
-                Volver
-              </button>
-              <button
-                onClick={() => { confirmacionCancelacion.ejecutar(); setConfirmacionCancelacion(null); }}
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition"
-              >
-                Sí, cancelar turno
-              </button>
-            </div>
-          </div>
-        </div>
+        <DialogoConfirmacion
+          titulo="¿Cancelar este turno?"
+          textoVolver="Volver"
+          textoConfirmar="Sí, cancelar turno"
+          onVolver={() => setConfirmacionCancelacion(null)}
+          onConfirmar={() => { confirmacionCancelacion.ejecutar(); setConfirmacionCancelacion(null); }}
+        >
+          {confirmacionCancelacion.descripcion}.
+          Esta acción no se puede deshacer; si cambiás de idea tendrías que reservar un turno nuevo.
+        </DialogoConfirmacion>
       )}
 
       {mostrarConfirmarSalir && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm text-slate-100 p-6 space-y-4">
-            <h2 className="font-bold text-lg">¿Cerrar sesión?</h2>
-            <p className="text-slate-400 text-sm">Vas a tener que volver a ingresar tu email y contraseña para entrar de nuevo.</p>
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => setMostrarConfirmarSalir(false)}
-                className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 font-medium transition"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={onLogout}
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition"
-              >
-                Sí, salir
-              </button>
-            </div>
-          </div>
-        </div>
+        <DialogoConfirmacion
+          titulo="¿Cerrar sesión?"
+          textoVolver="Cancelar"
+          textoConfirmar="Sí, salir"
+          onVolver={() => setMostrarConfirmarSalir(false)}
+          onConfirmar={onLogout}
+        >
+          Vas a tener que volver a ingresar tu email y contraseña para entrar de nuevo.
+        </DialogoConfirmacion>
       )}
     </div>
   );

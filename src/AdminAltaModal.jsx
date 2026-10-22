@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import { api } from './api';
+import { useDialogo } from './useDialogo';
 
 const inputClase = 'w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 text-sm';
 const labelClase = 'block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1';
 
 function AdminAltaModal({ onClose }) {
+  const { ref, tituloId } = useDialogo(onClose);
   const [tab, setTab] = useState('especialidad');
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg text-slate-100 overflow-hidden">
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg text-slate-100 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-          <h2 className="font-bold text-lg">Agregar al sistema</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 text-xl leading-none">&times;</button>
+          <h2 id={tituloId} className="font-bold text-lg">Agregar al sistema</h2>
+          <button onClick={onClose} aria-label="Cerrar" className="text-slate-400 hover:text-slate-200 text-xl leading-none">&times;</button>
         </div>
 
         <div className="flex border-b border-slate-800">
@@ -153,13 +155,14 @@ function FormEspecialidad() {
 // mayor) al presionar "Eliminar" sobre una especialidad. Lista los médicos
 // que se van a ver afectados antes de que el admin confirme el borrado lógico.
 function ModalConfirmarEliminar({ especialidad, onCancelar, onConfirmar }) {
+  const { ref, tituloId } = useDialogo(onCancelar);
   const medicos = especialidad.medicos || [];
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm text-slate-100 overflow-hidden">
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm text-slate-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-800">
-          <h3 className="font-bold text-lg">¿Eliminar "{especialidad.nombre}"?</h3>
+          <h3 id={tituloId} className="font-bold text-lg">¿Eliminar "{especialidad.nombre}"?</h3>
         </div>
         <div className="px-6 py-5 space-y-4">
           {medicos.length > 0 ? (
@@ -277,8 +280,8 @@ function FormMedico() {
       </div>
       <div>
         <label htmlFor="alta-medico-contrasena" className={labelClase}>Contraseña inicial <span className="text-red-500" aria-hidden="true">*</span></label>
-        <input id="alta-medico-contrasena" type="password" value={contrasena} onChange={(e) => setContrasena(e.target.value)} required minLength={10} placeholder="Mínimo 10 caracteres" className={inputClase} />
-        <p className="text-slate-500 text-xs mt-1">Con letras y números. El médico va a tener que cambiarla en su primer ingreso.</p>
+        <input id="alta-medico-contrasena" aria-describedby="alta-medico-contrasena-ayuda" type="password" value={contrasena} onChange={(e) => setContrasena(e.target.value)} required minLength={10} placeholder="Mínimo 10 caracteres" className={inputClase} />
+        <p id="alta-medico-contrasena-ayuda" className="text-slate-500 text-xs mt-1">Con letras y números. El médico va a tener que cambiarla en su primer ingreso.</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -289,7 +292,7 @@ function FormMedico() {
           <label htmlFor="alta-medico-consultorio" className={labelClase}>Consultorio</label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm pointer-events-none">Cons.</span>
-            <input id="alta-medico-consultorio"
+            <input id="alta-medico-consultorio" aria-describedby="alta-medico-consultorio-ayuda"
               type="text"
               value={consultorio}
               onChange={(e) => setConsultorio(e.target.value)}
@@ -298,13 +301,13 @@ function FormMedico() {
               className={`${inputClase} pl-14`}
             />
           </div>
-          <p className="text-slate-500 text-xs mt-1">Solo el número/letra, ej: "A" o "204" — no escribas la palabra "Consultorio"</p>
+          <p id="alta-medico-consultorio-ayuda" className="text-slate-500 text-xs mt-1">Solo el número/letra, ej: "A" o "204" — no escribas la palabra "Consultorio"</p>
         </div>
       </div>
 
       <div>
         <label htmlFor="alta-medico-duracion" className={labelClase}>Duración del turno (minutos)</label>
-        <input id="alta-medico-duracion"
+        <input id="alta-medico-duracion" aria-describedby="alta-medico-duracion-ayuda"
           type="number"
           value={duracionTurnoMinutos}
           onChange={(e) => setDuracionTurnoMinutos(e.target.value)}
@@ -313,7 +316,7 @@ function FormMedico() {
           step={5}
           className={inputClase}
         />
-        <p className="text-slate-500 text-xs mt-1">Cuánto dura cada turno de este médico. Se usa para generar los horarios disponibles en el wizard.</p>
+        <p id="alta-medico-duracion-ayuda" className="text-slate-500 text-xs mt-1">Cuánto dura cada turno de este médico. Se usa para generar los horarios disponibles en el wizard.</p>
       </div>
 
       <div>

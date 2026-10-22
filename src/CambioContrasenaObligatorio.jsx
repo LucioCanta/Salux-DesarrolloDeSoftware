@@ -49,8 +49,8 @@ function CambioContrasenaObligatorio({ usuario, onCambiada, onLogout }) {
         </div>
         <div>
           <label htmlFor="cambio-contrasena-nueva" className={labelClase}>Contraseña nueva</label>
-          <input id="cambio-contrasena-nueva" type="password" value={nueva} onChange={(e) => setNueva(e.target.value)} required minLength={10} autoComplete="new-password" placeholder="Mínimo 10 caracteres" className={inputClase} />
-          <p className="text-slate-500 text-xs mt-1">Mínimo 10 caracteres, con letras y números. No uses una contraseña común ni tus datos personales.</p>
+          <input id="cambio-contrasena-nueva" aria-describedby="cambio-contrasena-nueva-ayuda" type="password" value={nueva} onChange={(e) => setNueva(e.target.value)} required minLength={10} autoComplete="new-password" placeholder="Mínimo 10 caracteres" className={inputClase} />
+          <p id="cambio-contrasena-nueva-ayuda" className="text-slate-500 text-xs mt-1">Mínimo 10 caracteres, con letras y números. No uses una contraseña común ni tus datos personales.</p>
         </div>
         <div>
           <label htmlFor="cambio-confirmar-contrasena" className={labelClase}>Repetí la contraseña nueva</label>

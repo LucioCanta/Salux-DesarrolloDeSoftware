@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from './api';
+import { useDialogo } from './useDialogo';
 
 const inputClase = 'w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed';
 const labelClase = 'block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1';
@@ -7,6 +8,7 @@ const labelClase = 'block text-xs font-semibold uppercase tracking-wider text-sl
 const ROL_TEXTO = { admin: 'Administrador', medico: 'Médico', paciente: 'Paciente' };
 
 function PerfilModal({ usuario, onClose, onActualizado }) {
+  const { ref, tituloId } = useDialogo(onClose);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState('');
   const [perfil, setPerfil] = useState(null);
@@ -83,10 +85,10 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg text-slate-100 overflow-hidden max-h-[90vh] flex flex-col">
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg text-slate-100 overflow-hidden max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 shrink-0">
-          <h2 className="font-bold text-lg">Mi perfil</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 text-xl leading-none">&times;</button>
+          <h2 id={tituloId} className="font-bold text-lg">Mi perfil</h2>
+          <button onClick={onClose} aria-label="Cerrar" className="text-slate-400 hover:text-slate-200 text-xl leading-none">&times;</button>
         </div>
 
         <div className="px-6 py-5 space-y-6 overflow-y-auto">

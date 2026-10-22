@@ -86,11 +86,11 @@ describe('reprogramar turno', () => {
     expect(screen.queryByText('Elegí un nuevo día')).not.toBeInTheDocument()
   })
 
-  it('el botón × cierra el modal', async () => {
+  it('el botón Cerrar cierra el modal', async () => {
     const user = userEvent.setup()
     const { onClose } = montar()
     await screen.findByText('Dra. Corazón')
-    await user.click(screen.getByRole('button', { name: '×' }))
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }))
     expect(onClose).toHaveBeenCalled()
   })
 })
