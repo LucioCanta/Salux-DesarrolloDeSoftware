@@ -5,9 +5,19 @@ on:
   push:
     branches: [main]
 
+# Permisos mínimos para el token del workflow: solo leer el código. Sin esto, según la
+# configuración del repositorio, el token puede tener permiso de escritura.
+permissions:
+  contents: read
+
 jobs:
   backend:
+    name: backend (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]   # 24 es el de la imagen de Docker; 22 sigue en soporte
     defaults:
       run:
         working-directory: backend
@@ -30,7 +40,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
@@ -38,15 +48,38 @@ jobs:
       - run: npm run test:integration
 
   frontend:
+    name: frontend (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  # La imagen de Docker del backend tiene que construirse y cumplir lo mínimo de seguridad.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir la imagen
+        run: docker build -t salux-backend:ci backend
+      - name: Comprobar que la imagen es segura y mínima
+        run: |
+          set -eu
+          docker run --rm --entrypoint sh salux-backend:ci -c '
+            [ "$(id -u)" != "0" ] || { echo "ERROR: corre como root"; exit 1; }
+            [ "$NODE_ENV" = "production" ] || { echo "ERROR: NODE_ENV no es production"; exit 1; }
+            for f in test scripts docker crearAdmin.js seedDemo.js .env; do
+              [ ! -e "/app/$f" ] || { echo "ERROR: /app/$f no debería estar en la imagen"; exit 1; }
+            done
+            node -v'
