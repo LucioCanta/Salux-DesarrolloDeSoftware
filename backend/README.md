@@ -58,6 +58,15 @@ docker compose up --build
 
 Levanta tres servicios: PostgreSQL, Redis (contadores de los límites de intentos, sin puerto publicado) y el backend.
 
+Cómo está endurecido (y por qué no conviene aflojarlo):
+
+- **El backend no lee todo el `.env`.** Recibe solo las variables que usa, listadas en el bloque `environment` de `docker-compose.yml`. No le llegan `ADMIN_PASSWORD`, `POSTGRES_PASSWORD` ni las cuentas de prueba: si alguien lograra ejecutar código dentro del contenedor, no se llevaría esas credenciales. **Si agregás una variable nueva que el servidor necesite, sumala a ese bloque** (y a la lista del test `test/unit/infraestructura.test.js`).
+- **Los puertos solo escuchan en `127.0.0.1`**: nadie en tu red puede llegar a la API ni a la base.
+- **Contenedor del backend**: usuario sin privilegios, sistema de archivos de solo lectura, sin capacidades del kernel, con límites de procesos y memoria, y con `HEALTHCHECK`.
+- **La imagen** usa Node 24 (LTS), arranca en `NODE_ENV=production` y solo contiene `src/`, `prisma/` y las dependencias de producción: sin tests, sin `crearAdmin.js`/`seedDemo.js` ni archivos sueltos. El compose de desarrollo usa `NODE_ENV=development` a propósito.
+- Los scripts `crearAdmin.js`, `seedDemo.js` y `verificarEmailManual.js` se corren **desde tu máquina**, no dentro del contenedor.
+- Respaldos cifrados de la base: `scripts/respaldo/` (ver su README).
+
 ### Rol de base de datos de la app
 
 La app no se conecta con el superusuario `postgres`: usa el rol `salux_app`, dueño de `salux_db` y nada más. En una instalación nueva, `docker-compose` lo crea solo (script `docker/postgres-init/01-crear-rol-app.sh`) a partir de `DB_APP_USER` / `DB_APP_PASSWORD`. Si ya tenés un volumen de datos creado, el script no vuelve a correr; creá el rol a mano una vez:
