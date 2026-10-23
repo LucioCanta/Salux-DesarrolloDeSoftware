@@ -55,13 +55,18 @@ app.use(
 app.use(express.json({ limit: '10kb' }));
 app.use(cookieParser());
 
-// Límite general para toda la API
+// Límite general para toda la API. Con RATE_LIMIT_STORE=db (Vercel) el contador vive
+// en la base: es el único modo de que valga para TODAS las instancias serverless (en
+// memoria, cada una contaba por su lado y en la práctica no limitaba nada). Si la base
+// falla, deja pasar las peticiones en vez de agravar la caída. El health check queda
+// afuera para que un monitor no genere escrituras ni se bloquee solo.
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 300,
+    max: Number(process.env.API_LIMITE_PETICIONES) > 0 ? Number(process.env.API_LIMITE_PETICIONES) : 300,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => req.path === '/api/health',
     ...opcionesDeStore('api'),
   })
 );

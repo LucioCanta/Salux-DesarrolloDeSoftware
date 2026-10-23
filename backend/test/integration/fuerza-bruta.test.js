@@ -4,7 +4,7 @@ const { app, prisma, request, CLAVE, limpiarBase, crearUsuario } = require('../h
 
 // Cada intento sale de una IP distinta: así NO se activan los límites por IP, que es
 // justamente el caso a probar (una red de máquinas atacando una sola cuenta).
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 let contadorIp = 0;
 const login = (identificador, contrasena) => {
   contadorIp += 1;

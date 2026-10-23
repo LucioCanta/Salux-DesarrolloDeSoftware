@@ -13,7 +13,7 @@ const email = require('../../src/utils/email');
 
 // Cada pedido sale de una IP distinta: el límite por IP (10 cada 15 min) no es lo que se prueba acá,
 // sino que el límite por DIRECCIÓN de correo frene a un atacante que cambia de IP.
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 let contadorIp = 0;
 const post = (ruta, cuerpo) => {
   contadorIp += 1;

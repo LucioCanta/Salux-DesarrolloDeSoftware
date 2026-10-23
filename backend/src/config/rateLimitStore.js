@@ -52,7 +52,7 @@ class RedisRateLimitStore {
 
 // Store en la base de datos (Postgres): un upsert atómico por petición. Sirve
 // donde no hay Redis ni memoria compartida (Vercel). Cuesta un viaje a la base
-// por petición limitada, por eso solo se usa en los endpoints de autenticación.
+// por petición limitada.
 class DbRateLimitStore {
   constructor(prefijo) {
     this.prefijo = `${prefijo}:`;
@@ -93,11 +93,11 @@ class DbRateLimitStore {
 function opcionesDeStore(prefijo) {
   const client = obtenerClienteRedis();
   if (client) return { store: new RedisRateLimitStore(client, prefijo), passOnStoreError: true };
-  // RATE_LIMIT_STORE=db: contadores en Postgres. El límite GENERAL de la API
-  // ('api', 300 por 15 min) queda en memoria: cada petición pagaría un viaje a
-  // la base y sirve solo como red de contención; lo que protege las cuentas son
-  // los límites de autenticación, que sí usan la base.
-  if (process.env.RATE_LIMIT_STORE === 'db' && prefijo !== 'api') {
+  // RATE_LIMIT_STORE=db: contadores en Postgres, compartidos por todas las instancias.
+  // Incluye el límite GENERAL de la API ('api'): cuesta un upsert por petición, pero en
+  // serverless es lo único que lo hace efectivo. Si ese costo fuera un problema se puede
+  // dejar en memoria con API_RATE_LIMIT_MEMORIA=true (a costa de que no limite entre instancias).
+  if (process.env.RATE_LIMIT_STORE === 'db' && !(prefijo === 'api' && process.env.API_RATE_LIMIT_MEMORIA === 'true')) {
     return { store: new DbRateLimitStore(prefijo), passOnStoreError: true };
   }
   return {};
