@@ -4,11 +4,24 @@ const crypto = require('crypto');
 const prisma = require('../config/prisma');
 const { emailResetContrasena, emailVerificacionCuenta, emailRegistroDuplicado } = require('../utils/email');
 const { problemasDeContrasena } = require('../utils/politicaContrasena');
-const { permitirCorreo, avisarOmitido } = require('../utils/limiteCorreos');
+const { permitirCorreo, avisarOmitido, huella } = require('../utils/limiteCorreos');
+const { incrementar, leer, reiniciar } = require('../utils/contadores');
 const { segundoPlano } = require('../utils/segundoPlano');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const VERIFICACION_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+// Tope de contraseñas incorrectas por CUENTA en 15 minutos, sin importar desde qué IP
+// lleguen. El límite por IP + cuenta del router frena a una sola máquina, pero una red
+// de máquinas (cada una con pocos intentos) podría probar contraseñas sin fin sobre la
+// misma cuenta. Con el tope, una cuenta recibe como mucho N intentos por ventana.
+// Compromiso: alguien podría bloquear el inicio de sesión de otra persona 15 minutos
+// repitiendo intentos; igual puede entrar recuperando la contraseña (ese flujo no se bloquea).
+const VENTANA_FALLOS_MS = 15 * 60 * 1000;
+const limiteFallosPorCuenta = () => {
+  const n = Number(process.env.LOGIN_FALLOS_POR_CUENTA);
+  return Number.isFinite(n) && n > 0 ? n : 30;
+};
 
 const sha256 = (texto) => crypto.createHash('sha256').update(texto).digest('hex');
 const origenFrontend = () => (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',')[0];
@@ -284,10 +297,24 @@ const login = async (req, res) => {
     // 2. Comparamos la contraseña encriptada. Corremos bcrypt.compare SIEMPRE
     // (incluso si el usuario no existe, contra un hash "señuelo") para que el
     // tiempo de respuesta no delate si un email está registrado o no.
+    // 1.1 Tope de fallos por cuenta. Si la cuenta existe se cuenta por id (así dar el
+    // DNI o el email no duplica los intentos); si no existe, por la huella de lo que
+    // se escribió. Hacia afuera el comportamiento es el mismo: no revela si la cuenta existe.
+    const claveFallos = usuario ? `login:fallos:u${usuario.idUsuario}` : `login:fallos:${huella(identificador)}`;
+    const fallos = await leer(claveFallos);
+    if (fallos >= limiteFallosPorCuenta()) {
+      return res.status(429).json({
+        ok: false,
+        message: 'Demasiados intentos fallidos con esta cuenta. Probá de nuevo en unos minutos, o recuperá tu contraseña.'
+      });
+    }
+
     const passwordValida = await bcrypt.compare(contrasena, usuario?.contrasena || HASH_SENUELO);
     if (!usuario || !passwordValida) {
+      await incrementar(claveFallos, VENTANA_FALLOS_MS);
       return res.status(401).json({ ok: false, message: mensajeCredencialesInvalidas() });
     }
+    if (fallos > 0) await reiniciar(claveFallos); // entró bien: arranca de cero
 
     // 2.1 Bloqueamos el acceso si la cuenta fue desactivada por un administrador
     if (!usuario.activo) {

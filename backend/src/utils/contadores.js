@@ -28,4 +28,9 @@ async function leer(clave) {
   return filas.length ? Number(filas[0].hits) : 0;
 }
 
-module.exports = { incrementar, leer };
+// Borra el contador (por ejemplo, tras un inicio de sesión exitoso).
+async function reiniciar(clave) {
+  await prisma.rateLimitContador.deleteMany({ where: { clave } });
+}
+
+module.exports = { incrementar, leer, reiniciar };
