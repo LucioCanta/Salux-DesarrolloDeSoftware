@@ -37,7 +37,7 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/salux_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
@@ -55,7 +55,7 @@ jobs:
       matrix:
         node: [22, 24]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
@@ -70,7 +70,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Construir la imagen
         run: docker build -t salux-backend:ci backend
       - name: Comprobar que la imagen es segura y mínima
