@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from './api';
+import { useCampoInvalido, campoDelError } from './campos';
 import { useDialogo } from './useDialogo';
 
 const inputClase = 'w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed';
@@ -25,6 +26,7 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
   const [confirmarContrasena, setConfirmarContrasena] = useState('');
   const [cambiandoPassword, setCambiandoPassword] = useState(false);
   const [errorPassword, setErrorPassword] = useState('');
+  const { marcar, limpiar, atributos } = useCampoInvalido();
   const [exitoPassword, setExitoPassword] = useState('');
 
   useEffect(() => {
@@ -45,6 +47,7 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
     e.preventDefault();
     setErrorDatos('');
     setExitoDatos('');
+    limpiar();
     setGuardandoDatos(true);
     try {
       const tareas = [api.actualizarPerfil(nombre)];
@@ -56,6 +59,7 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
       onActualizado?.({ ...usuario, nombre });
     } catch (err) {
       setErrorDatos(err.message);
+      marcar(campoDelError(err, { nomYape: 'perfil-nombre-completo', obraSocial: 'perfil-obra-social', telefono: 'perfil-telefono' }));
     } finally {
       setGuardandoDatos(false);
     }
@@ -65,8 +69,10 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
     e.preventDefault();
     setErrorPassword('');
     setExitoPassword('');
+    limpiar();
     if (contrasenaNueva !== confirmarContrasena) {
       setErrorPassword('La confirmación no coincide con la contraseña nueva.');
+      marcar('perfil-confirmar-contrasena');
       return;
     }
     setCambiandoPassword(true);
@@ -78,6 +84,7 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
       setConfirmarContrasena('');
     } catch (err) {
       setErrorPassword(err.message);
+      marcar(campoDelError(err, { contrasenaNueva: 'perfil-contrasena-nueva' }));
     } finally {
       setCambiandoPassword(false);
     }
@@ -111,11 +118,11 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
                 </div>
 
                 {exitoDatos && <div role="status" className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exitoDatos}</div>}
-                {errorDatos && <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{errorDatos}</div>}
+                {errorDatos && <div id="perfil-error-datos" role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{errorDatos}</div>}
 
                 <div>
                   <label htmlFor="perfil-nombre-completo" className={labelClase}>Nombre completo</label>
-                  <input id="perfil-nombre-completo" type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required className={inputClase} />
+                  <input id="perfil-nombre-completo" {...atributos('perfil-nombre-completo', { error: 'perfil-error-datos' })} type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required className={inputClase} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -133,11 +140,11 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label htmlFor="perfil-obra-social" className={labelClase}>Obra social</label>
-                      <input id="perfil-obra-social" type="text" value={obraSocial} onChange={(e) => setObraSocial(e.target.value)} placeholder="Ej: OSDE" className={inputClase} />
+                      <input id="perfil-obra-social" {...atributos('perfil-obra-social', { error: 'perfil-error-datos' })} type="text" value={obraSocial} onChange={(e) => setObraSocial(e.target.value)} placeholder="Ej: OSDE" className={inputClase} />
                     </div>
                     <div>
                       <label htmlFor="perfil-telefono" className={labelClase}>Teléfono</label>
-                      <input id="perfil-telefono" type="text" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="Ej: 11-2345-6789" className={inputClase} />
+                      <input id="perfil-telefono" {...atributos('perfil-telefono', { error: 'perfil-error-datos' })} type="text" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="Ej: 11-2345-6789" className={inputClase} />
                     </div>
                   </div>
                 )}
@@ -165,7 +172,7 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Cambiar contraseña</p>
 
                   {exitoPassword && <div role="status" className="px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">{exitoPassword}</div>}
-                  {errorPassword && <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{errorPassword}</div>}
+                  {errorPassword && <div id="perfil-error-password" role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{errorPassword}</div>}
 
                   <div>
                     <label htmlFor="perfil-contrasena-actual" className={labelClase}>Contraseña actual</label>
@@ -174,11 +181,11 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label htmlFor="perfil-contrasena-nueva" className={labelClase}>Contraseña nueva</label>
-                      <input id="perfil-contrasena-nueva" type="password" value={contrasenaNueva} onChange={(e) => setContrasenaNueva(e.target.value)} required minLength={10} placeholder="Mínimo 10 caracteres" className={inputClase} />
+                      <input id="perfil-contrasena-nueva" {...atributos('perfil-contrasena-nueva', { error: 'perfil-error-password' })} type="password" value={contrasenaNueva} onChange={(e) => setContrasenaNueva(e.target.value)} required minLength={10} placeholder="Mínimo 10 caracteres" className={inputClase} />
                     </div>
                     <div>
                       <label htmlFor="perfil-confirmar-contrasena" className={labelClase}>Confirmar contraseña</label>
-                      <input id="perfil-confirmar-contrasena" type="password" value={confirmarContrasena} onChange={(e) => setConfirmarContrasena(e.target.value)} required minLength={10} className={inputClase} />
+                      <input id="perfil-confirmar-contrasena" {...atributos('perfil-confirmar-contrasena', { error: 'perfil-error-password' })} type="password" value={confirmarContrasena} onChange={(e) => setConfirmarContrasena(e.target.value)} required minLength={10} className={inputClase} />
                     </div>
                   </div>
 
