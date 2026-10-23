@@ -85,7 +85,9 @@ function montar(usuario, props = {}) {
   return { onLogout, onUsuarioActualizado }
 }
 
-const navegar = (user, nombre) => user.click(screen.getByRole('button', { name: nombre }))
+// El menú principal (las tarjetas del inicio repiten algunos de estos nombres).
+const menu = () => within(screen.getByRole('navigation', { name: 'Principal' }))
+const navegar = (user, nombre) => user.click(menu().getByRole('button', { name: nombre }))
 // La tarjeta de un turno se identifica por el nombre del médico/paciente en su título.
 const tarjeta = async (nombre) => (await screen.findByRole('heading', { name: nombre })).closest('.border-l-4')
 
@@ -115,11 +117,11 @@ describe('paciente', () => {
   it('el menú del paciente no incluye las secciones de admin ni de médico', async () => {
     montar(PACIENTE)
     await screen.findByText(/Recordatorio/)
-    expect(screen.getByRole('button', { name: /^Mis turnos/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Historial' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Administración' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Mi agenda/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Mi disponibilidad' })).not.toBeInTheDocument()
+    expect(menu().getByRole('button', { name: /^Mis turnos/ })).toBeInTheDocument()
+    expect(menu().getByRole('button', { name: 'Historial' })).toBeInTheDocument()
+    expect(menu().queryByRole('button', { name: 'Administración' })).not.toBeInTheDocument()
+    expect(menu().queryByRole('button', { name: /^Mi agenda/ })).not.toBeInTheDocument()
+    expect(menu().queryByRole('button', { name: 'Mi disponibilidad' })).not.toBeInTheDocument()
   })
 
   it('el menú cuenta los turnos activos (pendientes y confirmados)', async () => {
@@ -253,7 +255,7 @@ describe('paciente', () => {
     await screen.findByText(/Recordatorio/)
     await navegar(user, 'Historial')
 
-    const titulos = (await screen.findAllByRole('heading', { level: 3 })).map((h) => h.textContent)
+    const titulos = (await screen.findAllByRole('heading', { level: 2 })).map((h) => h.textContent)
     expect(titulos).toEqual(['Dra. Ojos', 'Dr. Piel']) // 25/02 antes que 20/02
     expect(screen.getByText('2 turnos en tu historial')).toBeInTheDocument()
   })
@@ -536,11 +538,11 @@ describe('médico', () => {
 
   it('el menú del médico no incluye las secciones de paciente ni de admin', async () => {
     montar(MEDICO)
-    expect(screen.getByRole('button', { name: /^Mi agenda/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Mi disponibilidad' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Solicitar turno' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Historial' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Administración' })).not.toBeInTheDocument()
+    expect(menu().getByRole('button', { name: /^Mi agenda/ })).toBeInTheDocument()
+    expect(menu().getByRole('button', { name: 'Mi disponibilidad' })).toBeInTheDocument()
+    expect(menu().queryByRole('button', { name: 'Solicitar turno' })).not.toBeInTheDocument()
+    expect(menu().queryByRole('button', { name: 'Historial' })).not.toBeInTheDocument()
+    expect(menu().queryByRole('button', { name: 'Administración' })).not.toBeInTheDocument()
   })
 
   it('cuenta los turnos de hoy que no están cancelados', async () => {
@@ -721,6 +723,114 @@ describe('médico', () => {
       await user.click(screen.getAllByRole('button', { name: 'Eliminar' })[0])
       expect(api.eliminarAusencia).toHaveBeenCalledWith(4)
       await vi.waitFor(() => expect(screen.queryByText(/05\/03\/2026 a 05\/03\/2026/)).not.toBeInTheDocument())
+    })
+  })
+})
+
+describe('orientación y teclado (WCAG 2.4, 2.1.1)', () => {
+  const tituloPrincipal = () => within(screen.getByRole('main')).getByRole('heading', { level: 1 })
+
+  it('el primer Tab ofrece "Saltar al contenido", que apunta al <main>', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    montar(PACIENTE)
+    await screen.findByText(/Recordatorio/)
+    await user.tab()
+    const salto = screen.getByRole('link', { name: 'Saltar al contenido' })
+    expect(salto).toHaveFocus()
+    expect(salto).toHaveAttribute('href', '#contenido-principal')
+    expect(screen.getByRole('main')).toHaveAttribute('id', 'contenido-principal')
+  })
+
+  it('el menú tiene nombre y marca la vista actual con aria-current', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    montar(PACIENTE)
+    await screen.findByText(/Recordatorio/)
+    expect(menu().getByRole('button', { name: 'Inicio' })).toHaveAttribute('aria-current', 'page')
+    await navegar(user, 'Historial')
+    expect(menu().getByRole('button', { name: 'Historial' })).toHaveAttribute('aria-current', 'page')
+    expect(menu().getByRole('button', { name: 'Inicio' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('cada vista pone su título a la pestaña y, al CAMBIAR de vista, el foco va a su título', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    montar(PACIENTE)
+    await screen.findByText(/Recordatorio/)
+    expect(document.title).toBe('Inicio — Salux')
+    // Al cargar no se roba el foco: recién se mueve cuando la persona navega.
+    expect(tituloPrincipal()).not.toHaveFocus()
+
+    await navegar(user, 'Historial')
+    expect(document.title).toBe('Historial — Salux')
+    expect(tituloPrincipal()).toHaveFocus()
+  })
+
+  it('el logo y las tarjetas del inicio son botones que se activan con el teclado', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    montar(PACIENTE)
+    await screen.findByText(/Recordatorio/)
+    await navegar(user, 'Historial')
+
+    screen.getByRole('button', { name: 'Salux, ir al inicio' }).focus()
+    await user.keyboard('{Enter}')
+    expect(document.title).toBe('Inicio — Salux')
+
+    // El título de la tarjeta es el botón; el resto de la tarjeta lo estira (after:inset-0).
+    within(screen.getByRole('main')).getByRole('button', { name: /^Mis turnos/ }).focus()
+    await user.keyboard('{Enter}')
+    expect(document.title).toBe('Mis turnos — Salux')
+  })
+
+  it('la tarjeta "Mis turnos" anuncia cuántos turnos activos hay', async () => {
+    montar(PACIENTE)
+    await screen.findByText(/Recordatorio/)
+    expect(within(screen.getByRole('main')).getByRole('button', { name: /^Mis turnos\s*\(2 activos\)$/ })).toBeInTheDocument()
+  })
+
+  it('la tabla de médicos del admin no tiene encabezados vacíos', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    api.todosLosTurnos.mockResolvedValue({ data: [] })
+    api.todosLosMedicos.mockResolvedValue({ data: [{
+      idMedico: 5, matricula: 'MP-5', consultorio: 'A', duracionTurnoMinutos: 30,
+      usuario: { idUsuario: 5, nomYape: 'Dr. House', email: 'h@x.com', dni: '1', activo: true }, especialidades: [],
+    }] })
+    montar(ADMIN)
+    await navegar(user, 'Administración')
+    await user.click(await screen.findByRole('button', { name: 'Médicos', exact: true }))
+    const tabla = await screen.findByRole('table')
+    for (const columna of within(tabla).getAllByRole('columnheader')) {
+      expect(columna, 'encabezado de columna sin texto').toHaveAccessibleName()
+    }
+  })
+
+  describe('"reducir animaciones" respeta el sistema operativo', () => {
+    const conPreferenciaDelSistema = (reduce) => {
+      window.matchMedia = vi.fn().mockImplementation((consulta) => ({
+        matches: reduce && consulta === '(prefers-reduced-motion: reduce)',
+        media: consulta, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+      }))
+    }
+    afterEach(() => { delete window.matchMedia })
+
+    it('sin preferencia guardada, el sistema que pide menos movimiento apaga las animaciones', async () => {
+      conPreferenciaDelSistema(true)
+      montar(PACIENTE)
+      await screen.findByText(/Recordatorio/)
+      expect(document.querySelector('.reduce-motion')).not.toBeNull()
+    })
+
+    it('sin preferencia guardada y sin pedido del sistema, las animaciones siguen', async () => {
+      conPreferenciaDelSistema(false)
+      montar(PACIENTE)
+      await screen.findByText(/Recordatorio/)
+      expect(document.querySelector('.reduce-motion')).toBeNull()
+    })
+
+    it('lo que la persona eligió en la app gana sobre el sistema', async () => {
+      conPreferenciaDelSistema(true)
+      getPreferenciasAccesibilidad.mockReturnValue({ reducirAnimaciones: false })
+      montar(PACIENTE)
+      await screen.findByText(/Recordatorio/)
+      expect(document.querySelector('.reduce-motion')).toBeNull()
     })
   })
 })

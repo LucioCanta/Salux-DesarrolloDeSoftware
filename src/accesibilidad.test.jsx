@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Guarda contra regresiones de accesibilidad: en cada pantalla, todo campo y todo
@@ -206,7 +206,7 @@ describe('panel principal', () => {
   it('paciente', async () => {
     const user = userEvent.setup()
     render(<Dashboard usuario={usuario('paciente')} onLogout={vi.fn()} onUsuarioActualizado={vi.fn()} />)
-    await user.click(await screen.findByRole('button', { name: /^Mis turnos/ }))
+    await user.click(await within(screen.getByRole('navigation', { name: 'Principal' })).findByRole('button', { name: /^Mis turnos/ }))
     await screen.findByRole('heading', { name: 'Mis turnos' })
     exigirNombresAccesibles()
   })
@@ -214,7 +214,7 @@ describe('panel principal', () => {
   it('administrador: turnos y médicos', async () => {
     const user = userEvent.setup()
     render(<Dashboard usuario={usuario('admin')} onLogout={vi.fn()} onUsuarioActualizado={vi.fn()} />)
-    await user.click(await screen.findByRole('button', { name: 'Administración' }))
+    await user.click(await within(screen.getByRole('navigation', { name: 'Principal' })).findByRole('button', { name: 'Administración' }))
     await screen.findByRole('heading', { name: 'Gestión de turnos' })
     exigirNombresAccesibles()
     expect(campo('Buscar por paciente, médico o especialidad')).toBeInTheDocument()
@@ -227,7 +227,7 @@ describe('panel principal', () => {
   it('médico: disponibilidad semanal y ausencias', async () => {
     const user = userEvent.setup()
     render(<Dashboard usuario={usuario('medico')} onLogout={vi.fn()} onUsuarioActualizado={vi.fn()} />)
-    await user.click(await screen.findByRole('button', { name: 'Mi disponibilidad' }))
+    await user.click(await within(screen.getByRole('navigation', { name: 'Principal' })).findByRole('button', { name: 'Mi disponibilidad' }))
     await screen.findByRole('heading', { name: 'Ausencias puntuales' })
     exigirNombresAccesibles()
     exigirIdsUnicos()
@@ -457,7 +457,7 @@ describe('mensajes que se anuncian solos', () => {
 
     api.misTurnos.mockRejectedValue(new Error('Sin conexión'))
     render(<Dashboard usuario={{ id: 1, nombre: 'Ana', rol: 'paciente' }} onLogout={vi.fn()} onUsuarioActualizado={vi.fn()} />)
-    await user.click(await screen.findByRole('button', { name: /^Mis turnos/ }))
+    await user.click(await within(screen.getByRole('navigation', { name: 'Principal' })).findByRole('button', { name: /^Mis turnos/ }))
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar tus turnos: Sin conexión')
   })
 
@@ -466,7 +466,7 @@ describe('mensajes que se anuncian solos', () => {
     api.todosLosTurnos.mockRejectedValue(new Error('Sin conexión'))
     api.todosLosMedicos.mockRejectedValue(new Error('Sin conexión'))
     render(<Dashboard usuario={{ id: 2, nombre: 'Admin', rol: 'admin' }} onLogout={vi.fn()} onUsuarioActualizado={vi.fn()} />)
-    await user.click(await screen.findByRole('button', { name: 'Administración' }))
+    await user.click(await within(screen.getByRole('navigation', { name: 'Principal' })).findByRole('button', { name: 'Administración' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar los turnos')
 
     // El aviso de turnos queda arriba en ambas pestañas: en "Médicos" se ven los dos.
