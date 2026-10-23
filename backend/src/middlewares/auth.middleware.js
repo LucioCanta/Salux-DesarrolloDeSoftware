@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/prisma');
+const { registrarError } = require('../utils/registrarError');
 
 const RUTAS_PERMITIDAS_SIN_CAMBIO = ['GET /api/auth/perfil', 'PATCH /api/auth/perfil/contrasena'];
 
@@ -70,7 +71,7 @@ const verificarToken = (req, res, next) => {
       // 5. Le decimos a Express que deje pasar la petición al controlador
       next();
     } catch (error) {
-      console.error(error);
+      registrarError(error);
       res.status(500).json({ ok: false, error: 'Error interno al verificar la sesión' });
     }
   });
@@ -96,7 +97,7 @@ const verificarAdmin = async (req, res, next) => {
     // Si llegó hasta acá, es porque es Admin. Le abrimos la puerta con next()
     next();
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno al verificar roles' });
   }
 };

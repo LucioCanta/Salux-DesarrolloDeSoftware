@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../config/prisma');
 const { diaCalendarioUTC, OFFSET_ARGENTINA_MINUTOS } = require('../utils/fechas');
+const { registrarError } = require('../utils/registrarError');
 
 const MINUTOS_ANTICIPACION = 60;
 const LIMITE_DIAS_PROXIMA_DISPONIBILIDAD = 30;
@@ -134,7 +135,7 @@ const crearMedico = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     if (error.code === 'P2025') {
       return res.status(400).json({ ok: false, message: 'Una o más especialidades no existen' });
     }
@@ -187,7 +188,7 @@ const obtenerMedicos = async (req, res) => {
       data: medicosConDisponibilidad
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -213,7 +214,7 @@ const obtenerTodosLosMedicos = async (req, res) => {
       data: medicos
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -245,7 +246,7 @@ const cambiarEstadoMedico = async (req, res) => {
       data: usuario
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -281,7 +282,7 @@ const actualizarMedico = async (req, res) => {
 
     res.json({ ok: true, message: 'Médico actualizado con éxito', data: medico });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     if (error.code === 'P2025') {
       return res.status(404).json({ ok: false, message: 'Médico no encontrado, o alguna de las especialidades indicadas no existe' });
     }

@@ -1,4 +1,5 @@
 const prisma = require('../config/prisma');
+const { registrarError } = require('../utils/registrarError');
 
 const actualizarPerfil = async (req, res) => {
   try {
@@ -32,7 +33,7 @@ const actualizarPerfil = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     // Error P2025 de Prisma significa "Record to update not found" (No se encontró el paciente)
     if (error.code === 'P2025') {
       return res.status(404).json({ ok: false, message: 'No se encontró un perfil de paciente para este usuario' });

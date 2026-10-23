@@ -4,9 +4,25 @@ const crypto = require('crypto');
 const prisma = require('../config/prisma');
 const { emailResetContrasena, emailVerificacionCuenta, emailRegistroDuplicado } = require('../utils/email');
 const { problemasDeContrasena } = require('../utils/politicaContrasena');
+const { permitirCorreo, avisarOmitido, huella } = require('../utils/limiteCorreos');
+const { incrementar, leer, reiniciar } = require('../utils/contadores');
+const { segundoPlano } = require('../utils/segundoPlano');
+const { registrarError } = require('../utils/registrarError');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const VERIFICACION_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+// Tope de contraseñas incorrectas por CUENTA en 15 minutos, sin importar desde qué IP
+// lleguen. El límite por IP + cuenta del router frena a una sola máquina, pero una red
+// de máquinas (cada una con pocos intentos) podría probar contraseñas sin fin sobre la
+// misma cuenta. Con el tope, una cuenta recibe como mucho N intentos por ventana.
+// Compromiso: alguien podría bloquear el inicio de sesión de otra persona 15 minutos
+// repitiendo intentos; igual puede entrar recuperando la contraseña (ese flujo no se bloquea).
+const VENTANA_FALLOS_MS = 15 * 60 * 1000;
+const limiteFallosPorCuenta = () => {
+  const n = Number(process.env.LOGIN_FALLOS_POR_CUENTA);
+  return Number.isFinite(n) && n > 0 ? n : 30;
+};
 
 const sha256 = (texto) => crypto.createHash('sha256').update(texto).digest('hex');
 const origenFrontend = () => (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',')[0];
@@ -65,10 +81,31 @@ function usuarioDeSesion(usuario, rol) {
 
 // Cada inicio de sesión crea una fila en `Sesion`: es lo que permite cerrarla
 // de verdad (logout, cambio de contraseña) en vez de esperar a que venza el token.
-function crearSesion(usuarioId, cliente = prisma) {
-  return cliente.sesion.create({
-    data: { usuarioId, expiraEn: new Date(Date.now() + REFRESH_TOKEN_TTL_MS) },
+// Cada refresh token lleva un `jti` aleatorio y la sesión recuerda cuál es el vigente.
+// Cada renovación entrega uno nuevo y el anterior deja de valer: si alguien presenta uno
+// ya rotado, es que existe una copia (robo) y la sesión se revoca (ver `refresh`).
+const nuevoJti = () => crypto.randomBytes(16).toString('hex');
+// Dos pestañas pueden renovar a la vez con la misma cookie: al segundo pedido se le
+// tolera el token anterior durante unos segundos, sin rotar de nuevo.
+const GRACIA_ROTACION_MS = 10 * 1000;
+// Sesiones simultáneas por usuario (una por navegador/dispositivo). Al superar el tope se
+// cierran las más antiguas: la tabla no crece sin límite ni acumula cookies olvidadas.
+const MAX_SESIONES_POR_USUARIO = 10;
+
+async function crearSesion(usuarioId, cliente = prisma) {
+  const sesion = await cliente.sesion.create({
+    data: { usuarioId, expiraEn: new Date(Date.now() + REFRESH_TOKEN_TTL_MS), jtiActual: nuevoJti(), rotadaEn: new Date() },
   });
+  const sobrantes = await cliente.sesion.findMany({
+    where: { usuarioId },
+    orderBy: [{ creadaEn: 'desc' }, { idSesion: 'desc' }],
+    skip: MAX_SESIONES_POR_USUARIO,
+    select: { idSesion: true },
+  });
+  if (sobrantes.length > 0) {
+    await cliente.sesion.deleteMany({ where: { idSesion: { in: sobrantes.map((x) => x.idSesion) } } });
+  }
+  return sesion;
 }
 
 // Arma el Access Token (corta duración, va en el body de la respuesta) y el
@@ -82,7 +119,7 @@ function generarTokens(usuario, rol, sesion) {
   );
 
   const refreshToken = jwt.sign(
-    { id: usuario.idUsuario, tv: usuario.tokenVersion, sid: sesion.idSesion },
+    { id: usuario.idUsuario, tv: usuario.tokenVersion, sid: sesion.idSesion, jti: sesion.jtiActual },
     process.env.JWT_REFRESH_SECRET,
     { expiresIn: REFRESH_TOKEN_TTL, algorithm: 'HS256' }
   );
@@ -111,14 +148,50 @@ const mensajeCredencialesInvalidas = () =>
     ? 'Credenciales inválidas. Si te registraste hace poco, activá tu cuenta con el enlace que te enviamos por email.'
     : 'Credenciales inválidas';
 
-// Genera un enlace de verificación nuevo y lo manda por email.
-async function enviarVerificacion(usuario) {
+// Genera un enlace de verificación nuevo, SI los límites de correo lo permiten
+// (ver utils/limiteCorreos.js). Devuelve los datos del correo o null. Si no se
+// permite, el token vigente NO se toca: el enlace que ya se mandó sigue siendo válido.
+async function prepararVerificacion(usuario) {
+  const control = await permitirCorreo('verificacion', usuario.email);
+  if (!control.permitido) {
+    avisarOmitido('verificacion', control.motivo);
+    await operacionVacia();
+    return null;
+  }
   const tokenPlano = crypto.randomBytes(32).toString('hex');
   await prisma.usuario.update({
     where: { idUsuario: usuario.idUsuario },
     data: { verificacionToken: sha256(tokenPlano), verificacionExpira: new Date(Date.now() + VERIFICACION_TTL_MS) }
   });
-  await emailVerificacionCuenta({ to: usuario.email, nombre: usuario.nomYape, link: `${origenFrontend()}/?verificar=${tokenPlano}` });
+  return { to: usuario.email, nombre: usuario.nomYape, link: `${origenFrontend()}/?verificar=${tokenPlano}` };
+}
+
+// Prepara el enlace y manda el correo (el envío en sí queda en segundo plano).
+async function enviarVerificacion(usuario) {
+  const datos = await prepararVerificacion(usuario);
+  if (datos) segundoPlano(emailVerificacionCuenta(datos));
+}
+
+// Para una dirección SIN cuenta (o que no corresponde): hace el mismo trabajo que
+// uno real, sobre contadores "sombra" y un update que no modifica nada. Así la
+// respuesta tarda lo mismo y no sirve para averiguar qué correos están registrados.
+async function igualarTiempo(tipo, email) {
+  await permitirCorreo(tipo, email, { simulado: true });
+  await operacionVacia();
+}
+
+// Un update que no modifica nada: cuesta como el que genera un token, para que una
+// cuenta real que cae dentro de la espera no responda más rápido que una inexistente.
+const operacionVacia = () => prisma.usuario.updateMany({ where: { idUsuario: -1 }, data: { verificacionToken: null } });
+
+// Manda un correo en segundo plano solo si los límites lo permiten.
+async function enviarSiPermitido(tipo, email, enviar) {
+  const control = await permitirCorreo(tipo, email);
+  if (!control.permitido) {
+    avisarOmitido(tipo, control.motivo);
+    return;
+  }
+  await enviar();
 }
 
 const MENSAJE_REGISTRO_CON_VERIFICACION =
@@ -140,7 +213,8 @@ const register = async (req, res) => {
         // Mismo costo de CPU que un alta real, para no delatarse por tiempo.
         await bcrypt.hash(contrasena, 12);
         if (usuarioExistente.email === email) {
-          emailRegistroDuplicado({ to: usuarioExistente.email, nombre: usuarioExistente.nomYape }).catch(() => {});
+          segundoPlano(enviarSiPermitido('duplicado', usuarioExistente.email,
+            () => emailRegistroDuplicado({ to: usuarioExistente.email, nombre: usuarioExistente.nomYape })));
         }
         return res.status(202).json({ ok: true, requiereVerificacion: true, message: MENSAJE_REGISTRO_CON_VERIFICACION });
       }
@@ -156,7 +230,8 @@ const register = async (req, res) => {
           paciente: { create: {} }
         }
       });
-      emailVerificacionCuenta({ to: email, nombre: nomYape, link: `${origenFrontend()}/?verificar=${tokenPlano}` }).catch(() => {});
+      segundoPlano(enviarSiPermitido('verificacion', email,
+        () => emailVerificacionCuenta({ to: email, nombre: nomYape, link: `${origenFrontend()}/?verificar=${tokenPlano}` })));
       return res.status(202).json({ ok: true, requiereVerificacion: true, message: MENSAJE_REGISTRO_CON_VERIFICACION });
     }
 
@@ -186,7 +261,7 @@ const register = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     // Carrera entre dos registros simultáneos con el mismo email/dni
     if (error.code === 'P2002') {
       if (requiereVerificacionEmail()) {
@@ -211,7 +286,7 @@ const verificarEmail = async (req, res) => {
     });
     res.json({ ok: true, message: 'Email verificado. Ya podés iniciar sesión.' });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -221,11 +296,16 @@ const reenviarVerificacion = async (req, res) => {
   try {
     const usuario = await prisma.usuario.findUnique({ where: { email: req.body.email } });
     if (usuario && usuario.activo && !usuario.emailVerificado) {
-      enviarVerificacion(usuario).catch((error) => console.error('[verificación] No se pudo reenviar:', error.message));
+      await enviarVerificacion(usuario);
+    } else {
+      await igualarTiempo('verificacion', req.body.email);
     }
-    res.json({ ok: true, message: 'Si la cuenta existe y falta verificarla, te enviamos un nuevo enlace.' });
+    res.json({
+      ok: true,
+      message: 'Si la cuenta existe y falta verificarla, te enviamos un nuevo enlace. Si ya pediste uno hace poco, esperá unos minutos antes de pedir otro.'
+    });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -244,10 +324,24 @@ const login = async (req, res) => {
     // 2. Comparamos la contraseña encriptada. Corremos bcrypt.compare SIEMPRE
     // (incluso si el usuario no existe, contra un hash "señuelo") para que el
     // tiempo de respuesta no delate si un email está registrado o no.
+    // 1.1 Tope de fallos por cuenta. Si la cuenta existe se cuenta por id (así dar el
+    // DNI o el email no duplica los intentos); si no existe, por la huella de lo que
+    // se escribió. Hacia afuera el comportamiento es el mismo: no revela si la cuenta existe.
+    const claveFallos = usuario ? `login:fallos:u${usuario.idUsuario}` : `login:fallos:${huella(identificador)}`;
+    const fallos = await leer(claveFallos);
+    if (fallos >= limiteFallosPorCuenta()) {
+      return res.status(429).json({
+        ok: false,
+        message: 'Demasiados intentos fallidos con esta cuenta. Probá de nuevo en unos minutos, o recuperá tu contraseña.'
+      });
+    }
+
     const passwordValida = await bcrypt.compare(contrasena, usuario?.contrasena || HASH_SENUELO);
     if (!usuario || !passwordValida) {
+      await incrementar(claveFallos, VENTANA_FALLOS_MS);
       return res.status(401).json({ ok: false, message: mensajeCredencialesInvalidas() });
     }
+    if (fallos > 0) await reiniciar(claveFallos); // entró bien: arranca de cero
 
     // 2.1 Bloqueamos el acceso si la cuenta fue desactivada por un administrador
     if (!usuario.activo) {
@@ -263,7 +357,7 @@ const login = async (req, res) => {
       res.status(401).json({ ok: false, message: mensajeCredencialesInvalidas() });
       const enlaceReciente = usuario.verificacionExpira && usuario.verificacionExpira.getTime() - Date.now() > VERIFICACION_TTL_MS - 60 * 60 * 1000;
       if (!enlaceReciente) {
-        enviarVerificacion(usuario).catch((error) => console.error('[verificación] No se pudo reenviar:', error.message));
+        segundoPlano(enviarVerificacion(usuario));
       }
       return;
     }
@@ -281,7 +375,7 @@ const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -322,15 +416,45 @@ const refresh = async (req, res) => {
       return res.status(401).json({ ok: false, message: 'Sesión inválida' });
     }
 
+    // Rotación con detección de reutilización. Las sesiones anteriores a la rotación
+    // (jtiActual nulo) se aceptan una vez y empiezan a rotar.
+    const jti = payload.jti ?? null;
+    let rotar = true;
+    if (sesion.jtiActual !== null && jti !== sesion.jtiActual) {
+      const reciente = sesion.rotadaEn && Date.now() - sesion.rotadaEn.getTime() < GRACIA_ROTACION_MS;
+      if (jti !== null && jti === sesion.jtiAnterior && reciente) {
+        rotar = false; // dos renovaciones casi simultáneas: la segunda no rota
+      } else {
+        // Se presentó un refresh token que ya había sido reemplazado: alguien tiene una
+        // copia. No se sabe quién es el legítimo, así que se revoca la sesión entera.
+        await prisma.sesion.deleteMany({ where: { idSesion: sesion.idSesion } });
+        console.warn(`[seguridad] Refresh token reutilizado: sesión ${sesion.idSesion} del usuario ${sesion.usuarioId}. Sesión revocada.`);
+        res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/auth' });
+        return res.status(401).json({ ok: false, message: 'Sesión inválida' });
+      }
+    }
+
     const rol = derivarRol(usuario);
-    // Renovación "deslizante": cada uso extiende la sesión otros 7 días y se
-    // emite una cookie nueva (la sesión sigue siendo la misma fila).
-    await prisma.sesion.update({
-      where: { idSesion: sesion.idSesion },
-      data: { expiraEn: new Date(Date.now() + REFRESH_TOKEN_TTL_MS) }
-    });
-    const { accessToken, refreshToken } = generarTokens(usuario, rol, sesion);
-    setRefreshCookie(res, refreshToken);
+    // Renovación "deslizante": cada uso extiende la sesión otros 7 días.
+    const vence = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+    let sesionVigente = sesion;
+    if (rotar) {
+      const jtiNuevo = nuevoJti();
+      // "Comparar y cambiar": si otra renovación se adelantó entre la lectura y acá,
+      // no rotamos de nuevo (count 0) y respondemos solo con un access token.
+      const { count } = await prisma.sesion.updateMany({
+        where: { idSesion: sesion.idSesion, jtiActual: sesion.jtiActual },
+        data: { jtiAnterior: sesion.jtiActual, jtiActual: jtiNuevo, rotadaEn: new Date(), expiraEn: vence }
+      });
+      if (count === 1) sesionVigente = { ...sesion, jtiActual: jtiNuevo };
+      else rotar = false;
+    }
+    if (!rotar) {
+      await prisma.sesion.updateMany({ where: { idSesion: sesion.idSesion }, data: { expiraEn: vence } });
+    }
+    const { accessToken, refreshToken } = generarTokens(usuario, rol, sesionVigente);
+    // Cookie nueva solo si se rotó; si no, el navegador conserva la que ya tiene.
+    if (rotar) setRefreshCookie(res, refreshToken);
 
     res.json({
       ok: true,
@@ -338,7 +462,7 @@ const refresh = async (req, res) => {
       usuario: usuarioDeSesion(usuario, rol)
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -372,7 +496,7 @@ const logoutTodas = async (req, res) => {
     res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/auth' });
     res.json({ ok: true, message: 'Cerraste sesión en todos tus dispositivos' });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -396,7 +520,7 @@ const obtenerPerfil = async (req, res) => {
       usuario: serializarPerfil(usuario, rol)
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -420,7 +544,7 @@ const actualizarPerfil = async (req, res) => {
       usuario: serializarPerfil(usuario, req.usuario.rol)
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -475,7 +599,7 @@ const cambiarContrasena = async (req, res) => {
       usuario: usuarioDeSesion(actualizado, rol)
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -489,7 +613,9 @@ const olvideContrasena = async (req, res) => {
     const { email } = req.body;
     const usuario = await prisma.usuario.findUnique({ where: { email } });
 
-    if (usuario && usuario.activo) {
+    const control = usuario && usuario.activo ? await permitirCorreo('recuperacion', usuario.email) : null;
+
+    if (control?.permitido) {
       const tokenPlano = crypto.randomBytes(32).toString('hex');
       const tokenHasheado = crypto.createHash('sha256').update(tokenPlano).digest('hex');
 
@@ -501,14 +627,23 @@ const olvideContrasena = async (req, res) => {
         }
       });
 
-      const origenFrontend = (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',')[0];
-      const link = `${origenFrontend}/?reset=${tokenPlano}`;
-      emailResetContrasena({ to: usuario.email, nombre: usuario.nomYape, link }).catch(() => {});
+      const link = `${origenFrontend()}/?reset=${tokenPlano}`;
+      segundoPlano(emailResetContrasena({ to: usuario.email, nombre: usuario.nomYape, link }));
+    } else if (control) {
+      // Pidió otro enlace demasiado pronto: no se genera un token nuevo, así el
+      // enlace que ya recibió sigue siendo válido (y nadie puede anularlo repitiendo el pedido).
+      avisarOmitido('recuperacion', control.motivo);
+      await operacionVacia();
+    } else {
+      await igualarTiempo('recuperacion', email);
     }
 
-    res.json({ ok: true, message: 'Si ese email está registrado, te enviamos un enlace para recuperar tu contraseña.' });
+    res.json({
+      ok: true,
+      message: 'Si ese email está registrado, te enviamos un enlace para recuperar tu contraseña. Si ya pediste uno hace poco, esperá unos minutos antes de pedir otro.'
+    });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -542,7 +677,7 @@ const resetearContrasena = async (req, res) => {
 
     res.json({ ok: true, message: 'Contraseña actualizada. Ya podés iniciar sesión.' });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };

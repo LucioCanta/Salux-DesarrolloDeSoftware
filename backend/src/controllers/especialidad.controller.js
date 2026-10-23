@@ -1,4 +1,5 @@
 const prisma = require('../config/prisma');
+const { registrarError } = require('../utils/registrarError');
 
 const crearEspecialidad = async (req, res) => {
   try {
@@ -39,7 +40,7 @@ const crearEspecialidad = async (req, res) => {
       data: nuevaEspecialidad
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     // Carrera entre dos altas simultáneas con el mismo nombre
     if (error.code === 'P2002') {
       return res.status(409).json({ ok: false, message: 'Ya existe una especialidad con ese nombre' });
@@ -63,7 +64,7 @@ const obtenerEspecialidades = async (req, res) => {
       data: especialidades 
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -91,7 +92,7 @@ const eliminarEspecialidad = async (req, res) => {
 
     res.json({ ok: true, message: 'Especialidad eliminada con éxito' });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
