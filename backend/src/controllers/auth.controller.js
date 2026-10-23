@@ -4,6 +4,8 @@ const crypto = require('crypto');
 const prisma = require('../config/prisma');
 const { emailResetContrasena, emailVerificacionCuenta, emailRegistroDuplicado } = require('../utils/email');
 const { problemasDeContrasena } = require('../utils/politicaContrasena');
+const { permitirCorreo, avisarOmitido } = require('../utils/limiteCorreos');
+const { segundoPlano } = require('../utils/segundoPlano');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const VERIFICACION_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
@@ -111,14 +113,45 @@ const mensajeCredencialesInvalidas = () =>
     ? 'Credenciales inválidas. Si te registraste hace poco, activá tu cuenta con el enlace que te enviamos por email.'
     : 'Credenciales inválidas';
 
-// Genera un enlace de verificación nuevo y lo manda por email.
-async function enviarVerificacion(usuario) {
+// Genera un enlace de verificación nuevo, SI los límites de correo lo permiten
+// (ver utils/limiteCorreos.js). Devuelve los datos del correo o null. Si no se
+// permite, el token vigente NO se toca: el enlace que ya se mandó sigue siendo válido.
+async function prepararVerificacion(usuario) {
+  const control = await permitirCorreo('verificacion', usuario.email);
+  if (!control.permitido) {
+    avisarOmitido('verificacion', control.motivo);
+    return null;
+  }
   const tokenPlano = crypto.randomBytes(32).toString('hex');
   await prisma.usuario.update({
     where: { idUsuario: usuario.idUsuario },
     data: { verificacionToken: sha256(tokenPlano), verificacionExpira: new Date(Date.now() + VERIFICACION_TTL_MS) }
   });
-  await emailVerificacionCuenta({ to: usuario.email, nombre: usuario.nomYape, link: `${origenFrontend()}/?verificar=${tokenPlano}` });
+  return { to: usuario.email, nombre: usuario.nomYape, link: `${origenFrontend()}/?verificar=${tokenPlano}` };
+}
+
+// Prepara el enlace y manda el correo (el envío en sí queda en segundo plano).
+async function enviarVerificacion(usuario) {
+  const datos = await prepararVerificacion(usuario);
+  if (datos) segundoPlano(emailVerificacionCuenta(datos));
+}
+
+// Para una dirección SIN cuenta (o que no corresponde): hace el mismo trabajo que
+// uno real, sobre contadores "sombra" y un update que no modifica nada. Así la
+// respuesta tarda lo mismo y no sirve para averiguar qué correos están registrados.
+async function igualarTiempo(tipo, email) {
+  await permitirCorreo(tipo, email, { simulado: true });
+  await prisma.usuario.updateMany({ where: { idUsuario: -1 }, data: { verificacionToken: null } });
+}
+
+// Manda un correo en segundo plano solo si los límites lo permiten.
+async function enviarSiPermitido(tipo, email, enviar) {
+  const control = await permitirCorreo(tipo, email);
+  if (!control.permitido) {
+    avisarOmitido(tipo, control.motivo);
+    return;
+  }
+  await enviar();
 }
 
 const MENSAJE_REGISTRO_CON_VERIFICACION =
@@ -140,7 +173,8 @@ const register = async (req, res) => {
         // Mismo costo de CPU que un alta real, para no delatarse por tiempo.
         await bcrypt.hash(contrasena, 12);
         if (usuarioExistente.email === email) {
-          emailRegistroDuplicado({ to: usuarioExistente.email, nombre: usuarioExistente.nomYape }).catch(() => {});
+          segundoPlano(enviarSiPermitido('duplicado', usuarioExistente.email,
+            () => emailRegistroDuplicado({ to: usuarioExistente.email, nombre: usuarioExistente.nomYape })));
         }
         return res.status(202).json({ ok: true, requiereVerificacion: true, message: MENSAJE_REGISTRO_CON_VERIFICACION });
       }
@@ -156,7 +190,8 @@ const register = async (req, res) => {
           paciente: { create: {} }
         }
       });
-      emailVerificacionCuenta({ to: email, nombre: nomYape, link: `${origenFrontend()}/?verificar=${tokenPlano}` }).catch(() => {});
+      segundoPlano(enviarSiPermitido('verificacion', email,
+        () => emailVerificacionCuenta({ to: email, nombre: nomYape, link: `${origenFrontend()}/?verificar=${tokenPlano}` })));
       return res.status(202).json({ ok: true, requiereVerificacion: true, message: MENSAJE_REGISTRO_CON_VERIFICACION });
     }
 
@@ -221,9 +256,14 @@ const reenviarVerificacion = async (req, res) => {
   try {
     const usuario = await prisma.usuario.findUnique({ where: { email: req.body.email } });
     if (usuario && usuario.activo && !usuario.emailVerificado) {
-      enviarVerificacion(usuario).catch((error) => console.error('[verificación] No se pudo reenviar:', error.message));
+      await enviarVerificacion(usuario);
+    } else {
+      await igualarTiempo('verificacion', req.body.email);
     }
-    res.json({ ok: true, message: 'Si la cuenta existe y falta verificarla, te enviamos un nuevo enlace.' });
+    res.json({
+      ok: true,
+      message: 'Si la cuenta existe y falta verificarla, te enviamos un nuevo enlace. Si ya pediste uno hace poco, esperá unos minutos antes de pedir otro.'
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
@@ -263,7 +303,7 @@ const login = async (req, res) => {
       res.status(401).json({ ok: false, message: mensajeCredencialesInvalidas() });
       const enlaceReciente = usuario.verificacionExpira && usuario.verificacionExpira.getTime() - Date.now() > VERIFICACION_TTL_MS - 60 * 60 * 1000;
       if (!enlaceReciente) {
-        enviarVerificacion(usuario).catch((error) => console.error('[verificación] No se pudo reenviar:', error.message));
+        segundoPlano(enviarVerificacion(usuario));
       }
       return;
     }
@@ -489,7 +529,9 @@ const olvideContrasena = async (req, res) => {
     const { email } = req.body;
     const usuario = await prisma.usuario.findUnique({ where: { email } });
 
-    if (usuario && usuario.activo) {
+    const control = usuario && usuario.activo ? await permitirCorreo('recuperacion', usuario.email) : null;
+
+    if (control?.permitido) {
       const tokenPlano = crypto.randomBytes(32).toString('hex');
       const tokenHasheado = crypto.createHash('sha256').update(tokenPlano).digest('hex');
 
@@ -501,12 +543,20 @@ const olvideContrasena = async (req, res) => {
         }
       });
 
-      const origenFrontend = (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',')[0];
-      const link = `${origenFrontend}/?reset=${tokenPlano}`;
-      emailResetContrasena({ to: usuario.email, nombre: usuario.nomYape, link }).catch(() => {});
+      const link = `${origenFrontend()}/?reset=${tokenPlano}`;
+      segundoPlano(emailResetContrasena({ to: usuario.email, nombre: usuario.nomYape, link }));
+    } else if (control) {
+      // Pidió otro enlace demasiado pronto: no se genera un token nuevo, así el
+      // enlace que ya recibió sigue siendo válido (y nadie puede anularlo repitiendo el pedido).
+      avisarOmitido('recuperacion', control.motivo);
+    } else {
+      await igualarTiempo('recuperacion', email);
     }
 
-    res.json({ ok: true, message: 'Si ese email está registrado, te enviamos un enlace para recuperar tu contraseña.' });
+    res.json({
+      ok: true,
+      message: 'Si ese email está registrado, te enviamos un enlace para recuperar tu contraseña. Si ya pediste uno hace poco, esperá unos minutos antes de pedir otro.'
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
