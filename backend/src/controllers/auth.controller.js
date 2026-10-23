@@ -80,10 +80,31 @@ function usuarioDeSesion(usuario, rol) {
 
 // Cada inicio de sesión crea una fila en `Sesion`: es lo que permite cerrarla
 // de verdad (logout, cambio de contraseña) en vez de esperar a que venza el token.
-function crearSesion(usuarioId, cliente = prisma) {
-  return cliente.sesion.create({
-    data: { usuarioId, expiraEn: new Date(Date.now() + REFRESH_TOKEN_TTL_MS) },
+// Cada refresh token lleva un `jti` aleatorio y la sesión recuerda cuál es el vigente.
+// Cada renovación entrega uno nuevo y el anterior deja de valer: si alguien presenta uno
+// ya rotado, es que existe una copia (robo) y la sesión se revoca (ver `refresh`).
+const nuevoJti = () => crypto.randomBytes(16).toString('hex');
+// Dos pestañas pueden renovar a la vez con la misma cookie: al segundo pedido se le
+// tolera el token anterior durante unos segundos, sin rotar de nuevo.
+const GRACIA_ROTACION_MS = 10 * 1000;
+// Sesiones simultáneas por usuario (una por navegador/dispositivo). Al superar el tope se
+// cierran las más antiguas: la tabla no crece sin límite ni acumula cookies olvidadas.
+const MAX_SESIONES_POR_USUARIO = 10;
+
+async function crearSesion(usuarioId, cliente = prisma) {
+  const sesion = await cliente.sesion.create({
+    data: { usuarioId, expiraEn: new Date(Date.now() + REFRESH_TOKEN_TTL_MS), jtiActual: nuevoJti(), rotadaEn: new Date() },
   });
+  const sobrantes = await cliente.sesion.findMany({
+    where: { usuarioId },
+    orderBy: [{ creadaEn: 'desc' }, { idSesion: 'desc' }],
+    skip: MAX_SESIONES_POR_USUARIO,
+    select: { idSesion: true },
+  });
+  if (sobrantes.length > 0) {
+    await cliente.sesion.deleteMany({ where: { idSesion: { in: sobrantes.map((x) => x.idSesion) } } });
+  }
+  return sesion;
 }
 
 // Arma el Access Token (corta duración, va en el body de la respuesta) y el
@@ -97,7 +118,7 @@ function generarTokens(usuario, rol, sesion) {
   );
 
   const refreshToken = jwt.sign(
-    { id: usuario.idUsuario, tv: usuario.tokenVersion, sid: sesion.idSesion },
+    { id: usuario.idUsuario, tv: usuario.tokenVersion, sid: sesion.idSesion, jti: sesion.jtiActual },
     process.env.JWT_REFRESH_SECRET,
     { expiresIn: REFRESH_TOKEN_TTL, algorithm: 'HS256' }
   );
@@ -389,15 +410,45 @@ const refresh = async (req, res) => {
       return res.status(401).json({ ok: false, message: 'Sesión inválida' });
     }
 
+    // Rotación con detección de reutilización. Las sesiones anteriores a la rotación
+    // (jtiActual nulo) se aceptan una vez y empiezan a rotar.
+    const jti = payload.jti ?? null;
+    let rotar = true;
+    if (sesion.jtiActual !== null && jti !== sesion.jtiActual) {
+      const reciente = sesion.rotadaEn && Date.now() - sesion.rotadaEn.getTime() < GRACIA_ROTACION_MS;
+      if (jti !== null && jti === sesion.jtiAnterior && reciente) {
+        rotar = false; // dos renovaciones casi simultáneas: la segunda no rota
+      } else {
+        // Se presentó un refresh token que ya había sido reemplazado: alguien tiene una
+        // copia. No se sabe quién es el legítimo, así que se revoca la sesión entera.
+        await prisma.sesion.deleteMany({ where: { idSesion: sesion.idSesion } });
+        console.warn(`[seguridad] Refresh token reutilizado: sesión ${sesion.idSesion} del usuario ${sesion.usuarioId}. Sesión revocada.`);
+        res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/auth' });
+        return res.status(401).json({ ok: false, message: 'Sesión inválida' });
+      }
+    }
+
     const rol = derivarRol(usuario);
-    // Renovación "deslizante": cada uso extiende la sesión otros 7 días y se
-    // emite una cookie nueva (la sesión sigue siendo la misma fila).
-    await prisma.sesion.update({
-      where: { idSesion: sesion.idSesion },
-      data: { expiraEn: new Date(Date.now() + REFRESH_TOKEN_TTL_MS) }
-    });
-    const { accessToken, refreshToken } = generarTokens(usuario, rol, sesion);
-    setRefreshCookie(res, refreshToken);
+    // Renovación "deslizante": cada uso extiende la sesión otros 7 días.
+    const vence = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+    let sesionVigente = sesion;
+    if (rotar) {
+      const jtiNuevo = nuevoJti();
+      // "Comparar y cambiar": si otra renovación se adelantó entre la lectura y acá,
+      // no rotamos de nuevo (count 0) y respondemos solo con un access token.
+      const { count } = await prisma.sesion.updateMany({
+        where: { idSesion: sesion.idSesion, jtiActual: sesion.jtiActual },
+        data: { jtiAnterior: sesion.jtiActual, jtiActual: jtiNuevo, rotadaEn: new Date(), expiraEn: vence }
+      });
+      if (count === 1) sesionVigente = { ...sesion, jtiActual: jtiNuevo };
+      else rotar = false;
+    }
+    if (!rotar) {
+      await prisma.sesion.updateMany({ where: { idSesion: sesion.idSesion }, data: { expiraEn: vence } });
+    }
+    const { accessToken, refreshToken } = generarTokens(usuario, rol, sesionVigente);
+    // Cookie nueva solo si se rotó; si no, el navegador conserva la que ya tiene.
+    if (rotar) setRefreshCookie(res, refreshToken);
 
     res.json({
       ok: true,

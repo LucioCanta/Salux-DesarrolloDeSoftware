@@ -67,6 +67,13 @@ model Sesion {
   creadaEn  DateTime @default(now())
   expiraEn  DateTime
 
+  // Rotación del refresh token: cada renovación entrega uno nuevo (jti distinto) y el
+  // anterior deja de valer. Presentar uno ya rotado delata un robo/copia: la sesión se revoca.
+  // Nulos en las sesiones anteriores a la rotación (ver migración 20261023000000).
+  jtiActual   String?
+  jtiAnterior String?
+  rotadaEn    DateTime?
+
   @@index([usuarioId])
   @@index([expiraEn])
 }
