@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Dashboard from './Dashboard';
 import CambioContrasenaObligatorio from './CambioContrasenaObligatorio';
+import { useCampoInvalido, campoDelError } from './campos';
 import { api, getUsuarioGuardado, guardarSesion, borrarSesion, actualizarUsuarioGuardado, getPreferenciasAccesibilidad, guardarPreferenciasAccesibilidad } from './api';
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const { marcar, limpiar, atributos } = useCampoInvalido();
 
   // Al cargar la app pedimos un Access Token nuevo con el refresh token de
   // la cookie httpOnly — es la única forma de recuperar sesión, ya que el
@@ -97,6 +99,7 @@ function App() {
   const handleRegistro = async (e) => {
     e.preventDefault();
     setError('');
+    limpiar();
     setEnviando(true);
     try {
       const respuesta = await api.register({ email, dni, contrasena, nomYape });
@@ -112,6 +115,10 @@ function App() {
       setUsuario(usuarioLogueado);
     } catch (err) {
       setError(err.message);
+      // El servidor dice qué campo falló (DNI, contraseña débil...): el foco va ahí.
+      marcar(campoDelError(err, {
+        email: 'acceso-identificador', dni: 'acceso-dni', contrasena: 'acceso-contrasena', nomYape: 'acceso-nombre-completo',
+      }));
     } finally {
       setEnviando(false);
     }
@@ -136,8 +143,10 @@ function App() {
     e.preventDefault();
     setError('');
     setMensaje('');
+    limpiar();
     if (contrasena !== confirmarContrasena) {
       setError('Las contraseñas no coinciden.');
+      marcar('acceso-confirmar-contrasena');
       return;
     }
     setEnviando(true);
@@ -151,6 +160,7 @@ function App() {
       setModo('login');
     } catch (err) {
       setError(err.message);
+      marcar(campoDelError(err, { contrasenaNueva: 'acceso-contrasena-nueva' }));
     } finally {
       setEnviando(false);
     }
@@ -158,6 +168,7 @@ function App() {
 
   const cambiarModo = (nuevoModo) => {
     setModo(nuevoModo);
+    limpiar();
     setError('');
     setMensaje('');
   };
@@ -224,7 +235,7 @@ function App() {
         </div>
 
         {error && (
-          <div role="alert" className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+          <div id="acceso-error" role="alert" className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
             {error}
           </div>
         )}
@@ -286,7 +297,7 @@ function App() {
               <label htmlFor="acceso-contrasena-nueva" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
                 Contraseña nueva <span className="text-red-500" aria-hidden="true">*</span>
               </label>
-              <input id="acceso-contrasena-nueva" aria-describedby="acceso-contrasena-nueva-ayuda"
+              <input id="acceso-contrasena-nueva" {...atributos('acceso-contrasena-nueva', { error: 'acceso-error', ayuda: 'acceso-contrasena-nueva-ayuda' })}
                 type="password"
                 value={contrasena}
                 onChange={(e) => setContrasena(e.target.value)}
@@ -301,7 +312,7 @@ function App() {
               <label htmlFor="acceso-confirmar-contrasena" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
                 Confirmar contraseña <span className="text-red-500" aria-hidden="true">*</span>
               </label>
-              <input id="acceso-confirmar-contrasena"
+              <input id="acceso-confirmar-contrasena" {...atributos('acceso-confirmar-contrasena', { error: 'acceso-error' })}
                 type="password"
                 value={confirmarContrasena}
                 onChange={(e) => setConfirmarContrasena(e.target.value)}
@@ -339,7 +350,7 @@ function App() {
                 <label htmlFor="acceso-nombre-completo" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
                   Nombre completo <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
-                <input id="acceso-nombre-completo"
+                <input id="acceso-nombre-completo" {...atributos('acceso-nombre-completo', { error: 'acceso-error' })}
                   type="text"
                   value={nomYape}
                   onChange={(e) => setNomYape(e.target.value)}
@@ -352,7 +363,7 @@ function App() {
                 <label htmlFor="acceso-dni" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
                   DNI <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
-                <input id="acceso-dni"
+                <input id="acceso-dni" {...atributos('acceso-dni', { error: 'acceso-error' })}
                   type="text"
                   value={dni}
                   onChange={(e) => setDni(e.target.value)}
@@ -368,7 +379,7 @@ function App() {
             <label htmlFor="acceso-identificador" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
               {modo === 'login' ? 'DNI o Email' : 'Email'} <span className="text-red-500" aria-hidden="true">*</span>
             </label>
-            <input id="acceso-identificador"
+            <input id="acceso-identificador" {...atributos('acceso-identificador', { error: 'acceso-error' })}
               type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -383,7 +394,7 @@ function App() {
               Contraseña <span className="text-red-500" aria-hidden="true">*</span>
             </label>
             <div className="relative">
-              <input id="acceso-contrasena"
+              <input id="acceso-contrasena" {...atributos('acceso-contrasena', { error: 'acceso-error' })}
                 type={mostrarPassword ? "text" : "password"}
                 value={contrasena}
                 onChange={(e) => setContrasena(e.target.value)}

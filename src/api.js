@@ -89,6 +89,8 @@ function armarError(data) {
   const error = new Error(detalleCampos || data?.message || data?.error || 'Error de conexión con el servidor');
   // Código de negocio opcional (ej: CAMBIO_CONTRASENA_REQUERIDO) para que la UI reaccione
   error.codigo = data?.codigo;
+  // Errores por campo ({ campo, mensaje }), para llevar el foco al campo afectado
+  error.campos = Array.isArray(data?.errores) ? data.errores : [];
   return error;
 }
 

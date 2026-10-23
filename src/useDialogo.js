@@ -22,7 +22,12 @@ const pila = [];
 // Devuelve la `ref` del panel y el `tituloId` que va en el encabezado del diálogo.
 // El panel además tiene que llevar role="dialog", aria-modal="true" y
 // aria-labelledby={tituloId}.
-export function useDialogo(onClose) {
+//
+// Con { cerrarConClicEnFondo: true } devuelve también `propsFondo`, para esparcir en
+// el contenedor que cubre la pantalla: un clic en el fondo oscuro cierra el diálogo.
+// Se usa en los que no tienen datos escritos que perder (confirmaciones, asistente
+// de turnos); en los formularios no, para que un clic de más no borre lo tipeado.
+export function useDialogo(onClose, { cerrarConClicEnFondo = false } = {}) {
   const ref = useRef(null);
   const tituloId = useId();
   const cerrarRef = useRef(onClose);
@@ -83,5 +88,11 @@ export function useDialogo(onClose) {
     };
   }, []);
 
-  return { ref, tituloId };
+  // Se escucha el botón al PRESIONAR (no al soltar): si alguien selecciona texto dentro
+  // del panel y suelta el mouse afuera, el "clic" resultante no debe cerrar nada.
+  const propsFondo = cerrarConClicEnFondo
+    ? { onMouseDown: (e) => { if (e.target === e.currentTarget) cerrarRef.current?.(); } }
+    : {};
+
+  return { ref, tituloId, propsFondo };
 }

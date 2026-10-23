@@ -3,10 +3,10 @@ import { useDialogo } from './useDialogo';
 // Confirmación simple ("¿Cancelar este turno?", "¿Cerrar sesión?"). Escape equivale a
 // la opción de volver atrás.
 function DialogoConfirmacion({ titulo, children, textoVolver, textoConfirmar, onVolver, onConfirmar }) {
-  const { ref, tituloId } = useDialogo(onVolver);
+  const { ref, tituloId, propsFondo } = useDialogo(onVolver, { cerrarConClicEnFondo: true });
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
+    <div {...propsFondo} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
       <div
         ref={ref}
         role="alertdialog"

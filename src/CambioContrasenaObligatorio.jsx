@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from './api';
+import { useCampoInvalido, campoDelError } from './campos';
 
 const inputClase = 'w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 text-sm';
 const labelClase = 'block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1';
@@ -12,12 +13,15 @@ function CambioContrasenaObligatorio({ usuario, onCambiada, onLogout }) {
   const [confirmar, setConfirmar] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState('');
+  const { marcar, limpiar, atributos } = useCampoInvalido();
 
   const guardar = async (e) => {
     e.preventDefault();
     setError('');
+    limpiar();
     if (nueva !== confirmar) {
       setError('Las contraseñas no coinciden.');
+      marcar('cambio-confirmar-contrasena');
       return;
     }
     setEnviando(true);
@@ -26,6 +30,7 @@ function CambioContrasenaObligatorio({ usuario, onCambiada, onLogout }) {
       onCambiada({ ...usuario, debeCambiarContrasena: false });
     } catch (err) {
       setError(err.message);
+      marcar(campoDelError(err, { contrasenaNueva: 'cambio-contrasena-nueva' }));
     } finally {
       setEnviando(false);
     }
@@ -41,7 +46,7 @@ function CambioContrasenaObligatorio({ usuario, onCambiada, onLogout }) {
           </p>
         </div>
 
-        {error && <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
+        {error && <div id="cambio-error" role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
 
         <div>
           <label htmlFor="cambio-contrasena-actual" className={labelClase}>Contraseña inicial (la que te dieron)</label>
@@ -49,12 +54,12 @@ function CambioContrasenaObligatorio({ usuario, onCambiada, onLogout }) {
         </div>
         <div>
           <label htmlFor="cambio-contrasena-nueva" className={labelClase}>Contraseña nueva</label>
-          <input id="cambio-contrasena-nueva" aria-describedby="cambio-contrasena-nueva-ayuda" type="password" value={nueva} onChange={(e) => setNueva(e.target.value)} required minLength={10} autoComplete="new-password" placeholder="Mínimo 10 caracteres" className={inputClase} />
+          <input id="cambio-contrasena-nueva" {...atributos('cambio-contrasena-nueva', { error: 'cambio-error', ayuda: 'cambio-contrasena-nueva-ayuda' })} type="password" value={nueva} onChange={(e) => setNueva(e.target.value)} required minLength={10} autoComplete="new-password" placeholder="Mínimo 10 caracteres" className={inputClase} />
           <p id="cambio-contrasena-nueva-ayuda" className="text-slate-500 text-xs mt-1">Mínimo 10 caracteres, con letras y números. No uses una contraseña común ni tus datos personales.</p>
         </div>
         <div>
           <label htmlFor="cambio-confirmar-contrasena" className={labelClase}>Repetí la contraseña nueva</label>
-          <input id="cambio-confirmar-contrasena" type="password" value={confirmar} onChange={(e) => setConfirmar(e.target.value)} required minLength={10} autoComplete="new-password" className={inputClase} />
+          <input id="cambio-confirmar-contrasena" {...atributos('cambio-confirmar-contrasena', { error: 'cambio-error' })} type="password" value={confirmar} onChange={(e) => setConfirmar(e.target.value)} required minLength={10} autoComplete="new-password" className={inputClase} />
         </div>
 
         <button type="submit" disabled={enviando} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition">

@@ -4,7 +4,7 @@ import { useDialogo } from './useDialogo';
 import { DIAS_A_MOSTRAR, generarProximosDias, generarHorariosDelDia } from './turnoUtils';
 
 function ReprogramarTurnoModal({ turno, onClose, onReprogramado }) {
-  const { ref, tituloId } = useDialogo(onClose);
+  const { ref, tituloId, propsFondo } = useDialogo(onClose, { cerrarConClicEnFondo: true });
   const [cargandoDisponibilidad, setCargandoDisponibilidad] = useState(true);
   const [errorCarga, setErrorCarga] = useState('');
   const [disponibilidadMedico, setDisponibilidadMedico] = useState(null);
@@ -44,7 +44,7 @@ function ReprogramarTurnoModal({ turno, onClose, onReprogramado }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
+    <div {...propsFondo} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg text-slate-100 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <h2 id={tituloId} className="font-bold text-lg">Reprogramar turno</h2>

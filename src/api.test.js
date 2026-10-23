@@ -135,6 +135,19 @@ describe('errores', () => {
     await expect(api.register({})).rejects.toThrow('dni: DNI inválido — contrasena: Muy corta')
   })
 
+  it('conserva el detalle por campo para poder llevar el foco al campo afectado', async () => {
+    const { api } = await cargarApi()
+    const errores = [{ campo: 'dni', mensaje: 'DNI inválido' }, { campo: 'contrasena', mensaje: 'Muy corta' }]
+    fetchMock.mockReturnValue(respuesta(400, { message: 'Datos inválidos', errores }))
+    await expect(api.register({})).rejects.toMatchObject({ campos: errores })
+  })
+
+  it('un error sin detalle por campo trae una lista vacía', async () => {
+    const { api } = await cargarApi()
+    fetchMock.mockReturnValue(respuesta(409, { message: 'El email o DNI ya está registrado' }))
+    await expect(api.register({})).rejects.toMatchObject({ campos: [] })
+  })
+
   it('conserva el código de negocio del servidor', async () => {
     const { api } = await cargarApi()
     fetchMock.mockReturnValue(respuesta(403, { codigo: 'CAMBIO_CONTRASENA_REQUERIDO', message: 'Cambiá tu contraseña' }))

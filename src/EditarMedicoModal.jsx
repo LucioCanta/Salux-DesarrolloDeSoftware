@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from './api';
+import { useCampoInvalido, campoDelError } from './campos';
 import { useDialogo } from './useDialogo';
 
 const inputClase = 'w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 text-sm';
@@ -12,6 +13,7 @@ function EditarMedicoModal({ medico, onClose, onActualizado }) {
   const [especialidadesIds, setEspecialidadesIds] = useState((medico.especialidades || []).map((e) => e.idEspecialidad));
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState('');
+  const { marcar, limpiar, atributos } = useCampoInvalido();
 
   const [especialidades, setEspecialidades] = useState([]);
   const [cargandoEsp, setCargandoEsp] = useState(true);
@@ -39,8 +41,12 @@ function EditarMedicoModal({ medico, onClose, onActualizado }) {
   const guardar = async (e) => {
     e.preventDefault();
     setError('');
+    limpiar();
+    // Casilla de la primera especialidad: a donde va el foco si falta elegir alguna.
+    const primeraEspecialidad = opciones[0] ? `editar-medico-esp-${opciones[0].idEspecialidad}` : null;
     if (especialidadesIds.length === 0) {
       setError('El médico tiene que tener al menos una especialidad.');
+      marcar(primeraEspecialidad);
       return;
     }
     setEnviando(true);
@@ -50,6 +56,9 @@ function EditarMedicoModal({ medico, onClose, onActualizado }) {
       onClose();
     } catch (err) {
       setError(err.message);
+      marcar(campoDelError(err, {
+        consultorio: 'editar-medico-consultorio', duracionTurnoMinutos: 'editar-medico-duracion', especialidadesIds: primeraEspecialidad,
+      }));
     } finally {
       setEnviando(false);
     }
@@ -66,19 +75,19 @@ function EditarMedicoModal({ medico, onClose, onActualizado }) {
         <form onSubmit={guardar} className="px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto">
           <p className="text-sm text-slate-400">{medico.usuario?.nomYape}</p>
 
-          {error && <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
+          {error && <div id="editar-medico-error" role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
 
           <div>
             <label htmlFor="editar-medico-consultorio" className={labelClase}>Consultorio</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm pointer-events-none">Cons.</span>
-              <input id="editar-medico-consultorio" type="text" value={consultorio} onChange={(e) => setConsultorio(e.target.value)} placeholder="204" maxLength={10} className={`${inputClase} pl-14`} />
+              <input id="editar-medico-consultorio" {...atributos('editar-medico-consultorio', { error: 'editar-medico-error' })} type="text" value={consultorio} onChange={(e) => setConsultorio(e.target.value)} placeholder="204" maxLength={10} className={`${inputClase} pl-14`} />
             </div>
           </div>
 
           <div>
             <label htmlFor="editar-medico-duracion" className={labelClase}>Duración del turno (minutos)</label>
-            <input id="editar-medico-duracion" type="number" value={duracionTurnoMinutos} onChange={(e) => setDuracionTurnoMinutos(e.target.value)} min={5} max={240} step={5} className={inputClase} />
+            <input id="editar-medico-duracion" {...atributos('editar-medico-duracion', { error: 'editar-medico-error' })} type="number" value={duracionTurnoMinutos} onChange={(e) => setDuracionTurnoMinutos(e.target.value)} min={5} max={240} step={5} className={inputClase} />
           </div>
 
           <div>
@@ -91,7 +100,7 @@ function EditarMedicoModal({ medico, onClose, onActualizado }) {
               <div className="grid grid-cols-2 gap-2">
                 {opciones.map((esp) => (
                   <label key={esp.idEspecialidad} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 text-sm cursor-pointer">
-                    <input type="checkbox" checked={especialidadesIds.includes(esp.idEspecialidad)} onChange={() => toggleEspecialidad(esp.idEspecialidad)} />
+                    <input id={`editar-medico-esp-${esp.idEspecialidad}`} type="checkbox" checked={especialidadesIds.includes(esp.idEspecialidad)} onChange={() => toggleEspecialidad(esp.idEspecialidad)} />
                     <span className={esp.inactiva ? 'text-slate-500 line-through' : ''}>{esp.nombre}</span>
                     {esp.inactiva && <span className="text-[10px] text-amber-400">inactiva</span>}
                   </label>
