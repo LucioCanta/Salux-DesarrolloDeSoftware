@@ -7,7 +7,11 @@
 --   rotadaEn    : cuándo se rotó por última vez.
 -- Las sesiones que ya existen quedan con jtiActual nulo y empiezan a rotar en su
 -- próxima renovación.
+--
+-- IF NOT EXISTS: es seguro ejecutarla dos veces. Si alguien la corre a mano en el
+-- editor SQL de Supabase, un `prisma migrate deploy` posterior no falla: la vuelve a
+-- ejecutar sin efecto y recién ahí queda registrada en _prisma_migrations.
 ALTER TABLE "Sesion"
-  ADD COLUMN "jtiActual" TEXT,
-  ADD COLUMN "jtiAnterior" TEXT,
-  ADD COLUMN "rotadaEn" TIMESTAMP(3);
+  ADD COLUMN IF NOT EXISTS "jtiActual" TEXT,
+  ADD COLUMN IF NOT EXISTS "jtiAnterior" TEXT,
+  ADD COLUMN IF NOT EXISTS "rotadaEn" TIMESTAMP(3);
