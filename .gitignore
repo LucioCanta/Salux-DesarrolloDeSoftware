@@ -29,3 +29,12 @@ dist-ssr
 *.sln
 *.sw?
 coverage/
+
+# Respaldos y claves: JAMÁS al repositorio (es público)
+*.dump
+*.dump.enc
+*.sql.gz
+*.pem
+*.key
+respaldos/
+respaldos/

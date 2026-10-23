@@ -14,7 +14,8 @@
     "db:studio": "prisma studio",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "node test/correr.js unit",
-    "test:integration": "node test/prepararBase.js && node test/correr.js integration"
+    "test:integration": "node test/prepararBase.js && node test/correr.js integration",
+    "secretos": "node scripts/generarSecretos.js"
   },
   "keywords": [],
   "author": "",
@@ -40,6 +41,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "supertest": "^7.3.1"
+    "supertest": "^7.3.1",
+    "yaml": "^2.9.1"
   }
 }
