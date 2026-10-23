@@ -3,7 +3,7 @@ import { api } from './api';
 import { useCampoInvalido, campoDelError } from './campos';
 import { useDialogo } from './useDialogo';
 
-const inputClase = 'w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed';
+const inputClase = 'w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-400 text-sm disabled:opacity-50 disabled:cursor-not-allowed';
 const labelClase = 'block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1';
 
 const ROL_TEXTO = { admin: 'Administrador', medico: 'Médico', paciente: 'Paciente' };
@@ -95,7 +95,7 @@ function PerfilModal({ usuario, onClose, onActualizado }) {
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg text-slate-100 overflow-hidden max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 shrink-0">
           <h2 id={tituloId} className="font-bold text-lg">Mi perfil</h2>
-          <button onClick={onClose} aria-label="Cerrar" className="text-slate-400 hover:text-slate-200 text-xl leading-none">&times;</button>
+          <button onClick={onClose} aria-label="Cerrar" className="text-slate-400 hover:text-slate-200 text-xl leading-none w-10 h-10 -mr-2 inline-flex items-center justify-center rounded-lg">&times;</button>
         </div>
 
         <div className="px-6 py-5 space-y-6 overflow-y-auto">

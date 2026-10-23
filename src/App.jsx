@@ -4,6 +4,14 @@ import CambioContrasenaObligatorio from './CambioContrasenaObligatorio';
 import { useCampoInvalido, campoDelError } from './campos';
 import { api, getUsuarioGuardado, guardarSesion, borrarSesion, actualizarUsuarioGuardado, getPreferenciasAccesibilidad, guardarPreferenciasAccesibilidad } from './api';
 
+const TITULOS_DE_ACCESO = {
+  login: 'Iniciar sesión',
+  registro: 'Crear una cuenta',
+  olvide: 'Recuperar contraseña',
+  reset: 'Nueva contraseña',
+  verificar: 'Verificación de email',
+};
+
 function App() {
   const [usuario, setUsuario] = useState(() => getUsuarioGuardado());
   // El Access Token vive en memoria (no en localStorage), así que se pierde
@@ -31,6 +39,11 @@ function App() {
   const [mensaje, setMensaje] = useState('');
   const [enviando, setEnviando] = useState(false);
   const { marcar, limpiar, atributos } = useCampoInvalido();
+
+  // Título de la pestaña según la pantalla (un lector de pantalla lo anuncia al cambiar).
+  useEffect(() => {
+    if (!usuario) document.title = `${TITULOS_DE_ACCESO[modo] || 'Salux'} — Salux`;
+  }, [modo, usuario]);
 
   // Al cargar la app pedimos un Access Token nuevo con el refresh token de
   // la cookie httpOnly — es la única forma de recuperar sesión, ya que el
@@ -191,9 +204,9 @@ function App() {
 
   if (verificandoSesion) {
     return (
-      <div role="status" className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
-        Cargando...
-      </div>
+      <main className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
+        <p role="status">Cargando...</p>
+      </main>
     );
   }
 
@@ -211,7 +224,7 @@ function App() {
   }
 
   return (
-    <div className={`min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 transition-all ${modoAdultoMayor ? 'text-[20px]' : 'text-base'}`}>
+    <main className={`min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 transition-all ${modoAdultoMayor ? 'text-[20px]' : 'text-base'}`}>
 
       {/* Tarjeta principal de Login (Modo oscuro por defecto #0F172A / #1E293B) */}
       <div className={`bg-slate-900 p-8 rounded-2xl shadow-2xl w-full border border-slate-800 text-slate-100 transition-all ${modoAdultoMayor ? 'max-w-xl p-10' : 'max-w-md'}`}>
@@ -259,7 +272,7 @@ function App() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="Ej: nombre@email.com"
-                className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
+                className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-400 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
               />
             </div>
             <button
@@ -304,9 +317,9 @@ function App() {
                 required
                 minLength={10}
                 placeholder="Mínimo 10 caracteres"
-                className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
+                className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-400 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
               />
-              <p id="acceso-contrasena-nueva-ayuda" className="text-slate-500 text-xs mt-1">Con letras y números; sin contraseñas comunes ni tus datos.</p>
+              <p id="acceso-contrasena-nueva-ayuda" className="text-slate-400 text-xs mt-1">Con letras y números; sin contraseñas comunes ni tus datos.</p>
             </div>
             <div>
               <label htmlFor="acceso-confirmar-contrasena" className={`block font-semibold uppercase tracking-wider text-slate-400 mb-1 ${modoAdultoMayor ? 'text-sm' : 'text-xs'}`}>
@@ -318,7 +331,7 @@ function App() {
                 onChange={(e) => setConfirmarContrasena(e.target.value)}
                 required
                 minLength={10}
-                className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
+                className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-400 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
               />
             </div>
             <button
@@ -356,7 +369,7 @@ function App() {
                   onChange={(e) => setNomYape(e.target.value)}
                   required
                   placeholder="Ej: Juan Pérez"
-                  className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
+                  className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-400 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
                 />
               </div>
               <div>
@@ -369,7 +382,7 @@ function App() {
                   onChange={(e) => setDni(e.target.value)}
                   required
                   placeholder="Ej: 30456789"
-                  className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
+                  className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-400 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
                 />
               </div>
             </>
@@ -385,7 +398,7 @@ function App() {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder={modo === 'login' ? 'Ej: 30456789 o nombre@email.com' : 'Ej: nombre@email.com'}
-              className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
+              className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-400 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
             />
           </div>
 
@@ -401,7 +414,7 @@ function App() {
                 required
                 minLength={modo === 'registro' ? 10 : undefined}
                 placeholder={modo === 'login' ? 'Ingresá tu contraseña' : 'Mínimo 10 caracteres'}
-                className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 pr-10 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
+                className={`w-full rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-400 pr-10 ${modoAdultoMayor ? 'px-5 py-4 text-lg min-h-[56px]' : 'px-4 py-3 text-sm'}`}
               />
               {/* Botón del ícono de visibilidad (ojo) */}
               <button
@@ -485,11 +498,11 @@ function App() {
       </div>
 
       {/* Footer / Copyright según el documento */}
-      <div className="mt-6 text-center text-slate-500 text-xs">
+      <footer className="mt-6 text-center text-slate-400 text-xs">
         © 2026 Salux — Sistema Médico Accesible
-      </div>
+      </footer>
 
-    </div>
+    </main>
   );
 }
 
