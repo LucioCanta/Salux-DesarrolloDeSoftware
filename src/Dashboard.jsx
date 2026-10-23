@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api, getPreferenciasAccesibilidad, guardarPreferenciasAccesibilidad } from './api';
 import NuevoTurnoModal from './NuevoTurnoModal';
 import AdminAltaModal from './AdminAltaModal';
@@ -86,9 +86,40 @@ function iniciales(nombre) {
   return nombre.trim().split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 }
 
+// ¿La persona pidió menos movimiento en su sistema operativo?
+function prefiereMenosMovimiento() {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+const TITULOS_DE_VISTA = {
+  dashboard: 'Inicio',
+  'mis-turnos': 'Mis turnos',
+  historial: 'Historial',
+  admin: 'Administración',
+  'agenda-medico': 'Mi agenda',
+  disponibilidad: 'Mi disponibilidad',
+};
+
 function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   const [vistaActual, setVistaActual] = useState('dashboard');
   const [filtroEstado, setFiltroEstado] = useState('Todos');
+
+  // En una app de una sola página, cambiar de vista no recarga nada: un lector de pantalla no
+  // se entera. Se actualiza el título de la pestaña y, al CAMBIAR de vista (no al cargar), el
+  // foco pasa al título de la vista nueva, que el lector anuncia.
+  const vistaPrevia = useRef(vistaActual);
+  useEffect(() => {
+    document.title = `${TITULOS_DE_VISTA[vistaActual] || 'Salux'} — Salux`;
+    if (vistaPrevia.current === vistaActual) return;
+    vistaPrevia.current = vistaActual;
+    const titulo = document.querySelector('main h1');
+    if (titulo) {
+      titulo.tabIndex = -1;
+      titulo.style.outline = 'none'; // el foco es programático: no es un control con el que se interactúa
+      titulo.focus({ preventScroll: true });
+    }
+  }, [vistaActual]);
 
   // Estados de accesibilidad globales
   const [menuAccesibilidadAbierto, setMenuAccesibilidadAbierto] = useState(false);
@@ -98,11 +129,38 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   const [modoOscuro, setModoOscuro] = useState(prefsGuardadas.modoOscuro ?? true);
   const [altoContraste, setAltoContraste] = useState(prefsGuardadas.altoContraste ?? false);
   const [modoAdultoMayor, setModoAdultoMayor] = useState(prefsGuardadas.modoAdultoMayor ?? false);
-  const [reducirAnimaciones, setReducirAnimaciones] = useState(prefsGuardadas.reducirAnimaciones ?? false);
+  // Sin preferencia guardada se respeta la del sistema operativo (prefers-reduced-motion).
+  const [reducirAnimaciones, setReducirAnimaciones] = useState(prefsGuardadas.reducirAnimaciones ?? prefiereMenosMovimiento());
 
   useEffect(() => {
     guardarPreferenciasAccesibilidad({ modoOscuro, altoContraste, modoAdultoMayor, reducirAnimaciones });
   }, [modoOscuro, altoContraste, modoAdultoMayor, reducirAnimaciones]);
+
+  // Colores por tema. Cada combinación cumple WCAG AA (4,5:1) sobre su fondo; los números
+  // están medidos con axe-core (ver test/a11y). No uses la variante dark de Tailwind: depende
+  // del tema del SISTEMA operativo, no del que la persona elige acá.
+  // Texto secundario sobre el fondo de la PÁGINA (oscuro en el tema oscuro, claro en los demás).
+  const textoApoyo = altoContraste ? 'text-slate-700' : modoOscuro ? 'text-slate-400' : 'text-slate-600';
+  // Texto secundario sobre las TARJETAS (blancas en alto contraste, oscuras en el resto).
+  // Azul de las etiquetas dentro de tarjetas: claro sobre tarjeta oscura, profundo sobre tarjeta blanca.
+  const azulEnTarjeta = altoContraste ? 'text-blue-800' : 'text-blue-400';
+  const textoEnTarjeta = altoContraste ? 'text-slate-700' : 'text-slate-400';
+  // Acción destructiva ("Eliminar") sobre tarjeta: rojo claro sobre oscuro, rojo profundo sobre blanco.
+  const claseEliminar = altoContraste ? 'text-[#991B1B] hover:text-[#7F1D1D]' : 'text-red-400 hover:text-red-300';
+  // Elemento "activo" del menú: azul claro sobre fondo oscuro, azul profundo sobre fondo claro.
+  const textoAzul = modoOscuro ? 'text-[#60A5FA]' : 'text-[#1D4ED8]';
+  const tonoAzul = modoOscuro ? 'bg-[#2563EB]/10 text-[#60A5FA]' : 'bg-[#2563EB]/10 text-[#1D4ED8]';
+  const claseNavActiva = altoContraste ? 'bg-black text-white font-semibold' : `${tonoAzul} font-semibold`;
+  const claseSalir = altoContraste ? 'text-[#991B1B]' : modoOscuro ? 'text-[#F87171]' : 'text-[#B91C1C]';
+  const claseSaludo = altoContraste ? 'text-black font-medium' : modoOscuro ? 'text-[#94A3B8]' : 'text-[#475569]';
+  // Anillo de foco de una tarjeta clicable (solo con teclado).
+  const anilloFoco = altoContraste
+    ? 'has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-black'
+    : modoOscuro
+      ? 'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#60A5FA]'
+      : 'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#1D4ED8]';
+  // Bordes y fondos de los botones del encabezado (antes dependían del tema del sistema).
+  const bordeEncabezado = altoContraste ? 'border-black text-black bg-white' : modoOscuro ? 'border-[#334155] hover:bg-slate-800' : 'border-[#E2E8F0] hover:bg-slate-100';
 
   // Turnos reales del paciente logueado (sección 2.3 del documento)
   const esPaciente = usuario.rol === 'paciente';
@@ -432,6 +490,13 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
       }`}
     >
 
+      <a
+        href="#contenido-principal"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-white focus:text-black focus:font-semibold focus:shadow-lg"
+      >
+        Saltar al contenido
+      </a>
+
       {/* ========================================== */}
       {/* NAVBAR UNIFICADO                          */}
       {/* ========================================== */}
@@ -442,19 +507,20 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
 
           <div className="flex items-center space-x-6">
-            <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setVistaActual('dashboard')}>
-              <div className="w-9 h-9 rounded-xl bg-[#2563EB] flex items-center justify-center text-white font-bold shadow-sm">
+            <button type="button" aria-label="Salux, ir al inicio" className="flex items-center space-x-2 rounded-lg" onClick={() => setVistaActual('dashboard')}>
+              <span className="w-9 h-9 rounded-xl bg-[#2563EB] flex items-center justify-center text-white font-bold shadow-sm">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
-              </div>
+              </span>
               <span className="font-bold tracking-tight text-xl">Salux</span>
-            </div>
+            </button>
 
-            <nav className="hidden md:flex items-center space-x-4 font-medium" style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>
+            <nav aria-label="Principal" className="hidden md:flex items-center space-x-4 font-medium" style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>
               <button
                 onClick={() => setVistaActual('dashboard')}
-                className={`px-3 py-1.5 rounded-lg transition ${vistaActual === 'dashboard' ? 'bg-[#2563EB]/10 text-[#2563EB] font-semibold' : 'hover:text-[#2563EB]'}`}
+                aria-current={vistaActual === 'dashboard' ? 'page' : undefined}
+                className={`px-3 py-1.5 rounded-lg transition ${vistaActual === 'dashboard' ? claseNavActiva : 'hover:text-[#2563EB]'}`}
               >
                 Inicio
               </button>
@@ -466,7 +532,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               {esPaciente && (
                 <button
                   onClick={() => setVistaActual('mis-turnos')}
-                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${vistaActual === 'mis-turnos' ? 'bg-[#2563EB]/10 text-[#2563EB] font-semibold' : 'hover:text-[#2563EB]'}`}
+                  aria-current={vistaActual === 'mis-turnos' ? 'page' : undefined}
+                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${vistaActual === 'mis-turnos' ? claseNavActiva : 'hover:text-[#2563EB]'}`}
                 >
                   Mis turnos
                   {turnosActivos.length > 0 && (
@@ -477,7 +544,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               {esPaciente && (
                 <button
                   onClick={() => setVistaActual('historial')}
-                  className={`px-3 py-1.5 rounded-lg transition ${vistaActual === 'historial' ? 'bg-[#2563EB]/10 text-[#2563EB] font-semibold' : 'hover:text-[#2563EB]'}`}
+                  aria-current={vistaActual === 'historial' ? 'page' : undefined}
+                  className={`px-3 py-1.5 rounded-lg transition ${vistaActual === 'historial' ? claseNavActiva : 'hover:text-[#2563EB]'}`}
                 >
                   Historial
                 </button>
@@ -485,7 +553,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               {esAdmin && (
                 <button
                   onClick={() => setVistaActual('admin')}
-                  className={`px-3 py-1.5 rounded-lg transition ${vistaActual === 'admin' ? 'bg-[#2563EB]/10 text-[#2563EB] font-semibold' : 'hover:text-[#2563EB]'}`}
+                  aria-current={vistaActual === 'admin' ? 'page' : undefined}
+                  className={`px-3 py-1.5 rounded-lg transition ${vistaActual === 'admin' ? claseNavActiva : 'hover:text-[#2563EB]'}`}
                 >
                   Administración
                 </button>
@@ -493,7 +562,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               {esMedico && (
                 <button
                   onClick={() => setVistaActual('agenda-medico')}
-                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${vistaActual === 'agenda-medico' ? 'bg-[#2563EB]/10 text-[#2563EB] font-semibold' : 'hover:text-[#2563EB]'}`}
+                  aria-current={vistaActual === 'agenda-medico' ? 'page' : undefined}
+                  className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${vistaActual === 'agenda-medico' ? claseNavActiva : 'hover:text-[#2563EB]'}`}
                 >
                   Mi agenda
                   {turnosHoyMedico.length > 0 && (
@@ -504,7 +574,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               {esMedico && (
                 <button
                   onClick={() => setVistaActual('disponibilidad')}
-                  className={`px-3 py-1.5 rounded-lg transition ${vistaActual === 'disponibilidad' ? 'bg-[#2563EB]/10 text-[#2563EB] font-semibold' : 'hover:text-[#2563EB]'}`}
+                  aria-current={vistaActual === 'disponibilidad' ? 'page' : undefined}
+                  className={`px-3 py-1.5 rounded-lg transition ${vistaActual === 'disponibilidad' ? claseNavActiva : 'hover:text-[#2563EB]'}`}
                 >
                   Mi disponibilidad
                 </button>
@@ -518,7 +589,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               <button
                 onClick={() => setMenuAccesibilidadAbierto(!menuAccesibilidadAbierto)}
                 className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg border transition font-medium ${
-                  altoContraste ? 'border-black text-black bg-white' : 'border-[#E2E8F0] dark:border-[#334155] hover:bg-slate-100 dark:hover:bg-slate-800'
+                  bordeEncabezado
                 }`}
                 style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}
                 aria-expanded={menuAccesibilidadAbierto}
@@ -528,21 +599,21 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
 
               {menuAccesibilidadAbierto && (
                 <div className={`absolute right-0 mt-2 w-72 rounded-xl shadow-2xl p-4 z-50 border ${
-                  altoContraste ? 'bg-white border-black text-black' : 'bg-white dark:bg-[#1E293B] border-[#E2E8F0] dark:border-[#334155] text-slate-800 dark:text-[#F1F5F9]'
+                  altoContraste ? 'bg-white border-black text-black' : modoOscuro ? 'bg-[#1E293B] border-[#334155] text-[#F1F5F9]' : 'bg-white border-[#E2E8F0] text-slate-800'
                 }`}>
-                  <h3 className="font-bold uppercase tracking-wider text-slate-400 mb-3" style={{ fontSize: modoAdultoMayor ? '14px' : '12px' }}>Accesibilidad</h3>
+                  <h3 className={`font-bold uppercase tracking-wider ${textoApoyo} mb-3`} style={{ fontSize: modoAdultoMayor ? '14px' : '12px' }}>Accesibilidad</h3>
                   <div className="space-y-3" style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>
                     <label className="flex items-center justify-between cursor-pointer">
                       <span>Modo oscuro</span>
-                      <input type="checkbox" checked={modoOscuro} onChange={() => { setModoOscuro(!modoOscuro); if(altoContraste) setAltoContraste(false); }} />
+                      <input type="checkbox" className="w-5 h-5 accent-[#2563EB]" checked={modoOscuro} onChange={() => { setModoOscuro(!modoOscuro); if(altoContraste) setAltoContraste(false); }} />
                     </label>
                     <label className="flex items-center justify-between cursor-pointer">
                       <span>Reducir animaciones</span>
-                      <input type="checkbox" checked={reducirAnimaciones} onChange={() => setReducirAnimaciones(!reducirAnimaciones)} />
+                      <input type="checkbox" className="w-5 h-5 accent-[#2563EB]" checked={reducirAnimaciones} onChange={() => setReducirAnimaciones(!reducirAnimaciones)} />
                     </label>
                   </div>
 
-                  <p className="font-bold uppercase tracking-wider text-slate-400 mt-4 mb-2" style={{ fontSize: modoAdultoMayor ? '14px' : '12px' }}>Tema</p>
+                  <p className={`font-bold uppercase tracking-wider ${textoApoyo} mt-4 mb-2`} style={{ fontSize: modoAdultoMayor ? '14px' : '12px' }}>Tema</p>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { id: 'normal', label: 'Normal' },
@@ -558,8 +629,8 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                           aria-pressed={activo}
                           className={`px-2 py-2 rounded-lg border font-medium transition ${
                             activo
-                              ? (altoContraste ? 'border-black bg-black text-white' : 'border-blue-500 bg-blue-500/10 text-blue-400')
-                              : (altoContraste ? 'border-black text-black' : 'border-slate-700 text-slate-300 hover:border-slate-500')
+                              ? (altoContraste ? 'border-black bg-black text-white' : modoOscuro ? 'border-blue-500 bg-blue-500/10 text-blue-300' : 'border-[#1D4ED8] bg-[#2563EB]/10 text-[#1D4ED8]')
+                              : (altoContraste ? 'border-black text-black' : modoOscuro ? 'border-slate-700 text-slate-300 hover:border-slate-500' : 'border-slate-300 text-slate-700 hover:border-slate-500')
                           }`}
                           style={{ fontSize: modoAdultoMayor ? '13px' : '11px' }}
                         >
@@ -575,21 +646,21 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             {/* Perfil de usuario */}
             <button
               onClick={() => setMostrarModalPerfil(true)}
-              className={`flex items-center space-x-2 border-l pl-3 hover:opacity-80 transition ${altoContraste ? 'border-black' : 'border-slate-300 dark:border-slate-700'}`}
+              className={`flex items-center space-x-2 border-l pl-3 hover:opacity-80 transition ${altoContraste ? 'border-black' : modoOscuro ? 'border-slate-700' : 'border-slate-300'}`}
               title="Ver mi perfil"
             >
-              <div className="w-8 h-8 rounded-full bg-blue-100 text-[#2563EB] font-bold flex items-center justify-center text-xs">{iniciales(usuario.nombre)}</div>
+              <div className="w-8 h-8 rounded-full bg-blue-100 text-[#1D4ED8] font-bold flex items-center justify-center text-xs">{iniciales(usuario.nombre)}</div>
               <span className="font-medium hidden sm:inline" style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>{usuario.nombre}</span>
             </button>
 
-            <button onClick={() => setMostrarConfirmarSalir(true)} className="text-[#DC2626] font-medium hover:underline px-2 py-1" style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>Salir</button>
+            <button onClick={() => setMostrarConfirmarSalir(true)} className={`${claseSalir} font-medium hover:underline px-2 py-1`} style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>Salir</button>
           </div>
 
           {/* Botón hamburguesa — visible solo en mobile/tablet */}
           <button
             onClick={() => setMenuMobileAbierto(!menuMobileAbierto)}
             className={`md:hidden flex items-center justify-center w-10 h-10 rounded-lg border transition ${
-              altoContraste ? 'border-black text-black bg-white' : 'border-[#E2E8F0] dark:border-[#334155] hover:bg-slate-100 dark:hover:bg-slate-800'
+              bordeEncabezado
             }`}
             aria-expanded={menuMobileAbierto}
             aria-controls="menu-mobile"
@@ -611,7 +682,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
         {/* ========================================== */}
         {menuMobileAbierto && (
           <div
-            id="menu-mobile"
+            id="menu-mobile" role="navigation" aria-label="Principal"
             className={`md:hidden border-t px-4 py-4 space-y-1 ${
               altoContraste ? 'bg-white border-black text-black' :
               modoOscuro ? 'bg-[#0F172A] border-[#334155] text-[#F1F5F9]' : 'bg-white border-[#E2E8F0] text-[#1E293B]'
@@ -619,9 +690,10 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           >
             <button
               onClick={() => irA('dashboard')}
+              aria-current={vistaActual === 'dashboard' ? 'page' : undefined}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${
                 vistaActual === 'dashboard'
-                  ? (altoContraste ? 'bg-black text-white' : 'bg-[#2563EB]/10 text-[#2563EB]')
+                  ? (altoContraste ? 'bg-black text-white' : tonoAzul)
                   : (altoContraste ? 'hover:bg-slate-100' : 'hover:bg-slate-800/60')
               }`}
               style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
@@ -649,9 +721,10 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             {esPaciente && (
               <button
                 onClick={() => irA('mis-turnos')}
+                aria-current={vistaActual === 'mis-turnos' ? 'page' : undefined}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${
                   vistaActual === 'mis-turnos'
-                    ? (altoContraste ? 'bg-black text-white' : 'bg-[#2563EB]/10 text-[#2563EB]')
+                    ? (altoContraste ? 'bg-black text-white' : tonoAzul)
                     : (altoContraste ? 'hover:bg-slate-100' : 'hover:bg-slate-800/60')
                 }`}
                 style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
@@ -670,9 +743,10 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             {esPaciente && (
               <button
                 onClick={() => irA('historial')}
+                aria-current={vistaActual === 'historial' ? 'page' : undefined}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${
                   vistaActual === 'historial'
-                    ? (altoContraste ? 'bg-black text-white' : 'bg-[#2563EB]/10 text-[#2563EB]')
+                    ? (altoContraste ? 'bg-black text-white' : tonoAzul)
                     : (altoContraste ? 'hover:bg-slate-100' : 'hover:bg-slate-800/60')
                 }`}
                 style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
@@ -687,9 +761,10 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             {esAdmin && (
               <button
                 onClick={() => irA('admin')}
+                aria-current={vistaActual === 'admin' ? 'page' : undefined}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${
                   vistaActual === 'admin'
-                    ? (altoContraste ? 'bg-black text-white' : 'bg-[#2563EB]/10 text-[#2563EB]')
+                    ? (altoContraste ? 'bg-black text-white' : tonoAzul)
                     : (altoContraste ? 'hover:bg-slate-100' : 'hover:bg-slate-800/60')
                 }`}
                 style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
@@ -707,9 +782,10 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             {esMedico && (
               <button
                 onClick={() => irA('agenda-medico')}
+                aria-current={vistaActual === 'agenda-medico' ? 'page' : undefined}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${
                   vistaActual === 'agenda-medico'
-                    ? (altoContraste ? 'bg-black text-white' : 'bg-[#2563EB]/10 text-[#2563EB]')
+                    ? (altoContraste ? 'bg-black text-white' : tonoAzul)
                     : (altoContraste ? 'hover:bg-slate-100' : 'hover:bg-slate-800/60')
                 }`}
                 style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
@@ -728,9 +804,10 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             {esMedico && (
               <button
                 onClick={() => irA('disponibilidad')}
+                aria-current={vistaActual === 'disponibilidad' ? 'page' : undefined}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${
                   vistaActual === 'disponibilidad'
-                    ? (altoContraste ? 'bg-black text-white' : 'bg-[#2563EB]/10 text-[#2563EB]')
+                    ? (altoContraste ? 'bg-black text-white' : tonoAzul)
                     : (altoContraste ? 'hover:bg-slate-100' : 'hover:bg-slate-800/60')
                 }`}
                 style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
@@ -752,7 +829,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 aria-pressed={modoOscuro}
                 className={`flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border font-medium transition ${
                   modoOscuro
-                    ? 'border-[#2563EB] text-[#2563EB] bg-[#2563EB]/10'
+                    ? `border-[#2563EB] ${textoAzul} bg-[#2563EB]/10`
                     : (altoContraste ? 'border-black text-black' : 'border-slate-700 text-slate-300')
                 }`}
                 style={{ fontSize: modoAdultoMayor ? '14px' : '12px' }}
@@ -783,7 +860,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 aria-pressed={modoAdultoMayor}
                 className={`flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border font-medium transition ${
                   modoAdultoMayor
-                    ? 'border-[#2563EB] text-[#2563EB] bg-[#2563EB]/10'
+                    ? `border-[#2563EB] ${textoAzul} bg-[#2563EB]/10`
                     : (altoContraste ? 'border-black text-black' : 'border-slate-700 text-slate-300')
                 }`}
                 style={{ fontSize: modoAdultoMayor ? '14px' : '12px' }}
@@ -802,7 +879,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${altoContraste ? 'hover:bg-slate-100' : 'hover:bg-slate-800/60'}`}
               style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
             >
-              <div className="w-5 h-5 shrink-0 rounded-full bg-blue-100 text-[#2563EB] font-bold flex items-center justify-center text-[10px]">{iniciales(usuario.nombre)}</div>
+              <div className="w-5 h-5 shrink-0 rounded-full bg-blue-100 text-[#1D4ED8] font-bold flex items-center justify-center text-[10px]">{iniciales(usuario.nombre)}</div>
               Mi perfil
             </button>
 
@@ -810,7 +887,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
 
             <button
               onClick={() => { setMostrarConfirmarSalir(true); setMenuMobileAbierto(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition text-[#DC2626] ${altoContraste ? 'hover:bg-slate-100' : 'hover:bg-red-500/10'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition ${claseSalir} ${altoContraste ? 'hover:bg-slate-100' : 'hover:bg-red-500/10'}`}
               style={{ fontSize: modoAdultoMayor ? '18px' : '15px' }}
             >
               <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -831,7 +908,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
         // ==========================================
         // VISTA 3: "Panel de Administración" (2.4)
         // ==========================================
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <main id="contenido-principal" tabIndex={-1} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           {errorAdmin && !cargandoAdmin && (
             <div role="alert" className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
               No se pudieron cargar los turnos: {errorAdmin}
@@ -840,7 +917,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <span className={`inline-block font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-2 ${
-                altoContraste ? 'bg-black text-white' : 'bg-[#2563EB]/10 text-[#2563EB]'
+                altoContraste ? 'bg-black text-white' : tonoAzul
               }`} style={{ fontSize: modoAdultoMayor ? '13px' : '11px' }}>
                 Panel de Administración
               </span>
@@ -915,7 +992,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 onChange={(e) => setBusquedaAdmin(e.target.value)}
                 placeholder="Buscar por paciente, médico o especialidad..."
                 className={`w-full px-4 py-2.5 rounded-lg border transition ${
-                  altoContraste ? 'bg-white border-black text-black' : 'bg-slate-800 border-slate-700 text-[#F1F5F9] placeholder:text-slate-500'
+                  altoContraste ? 'bg-white border-black text-black' : 'bg-slate-800 border-slate-700 text-[#F1F5F9] placeholder:text-slate-400'
                 }`}
                 style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}
               />
@@ -938,12 +1015,12 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             </div>
           </div>
 
-          <p className={`${altoContraste ? 'text-black' : 'text-slate-400'}`} style={{ fontSize: modoAdultoMayor ? '16px' : '13px' }}>
+          <p className={`${textoApoyo}`} style={{ fontSize: modoAdultoMayor ? '16px' : '13px' }}>
             Mostrando {turnosAdminFiltrados.length} de {turnosAdmin.length} turnos
           </p>
 
           {cargandoAdmin && (
-            <div role="status" className="text-slate-400 text-sm py-4">Cargando turnos...</div>
+            <div role="status" className={`${textoApoyo} text-sm py-4`}>Cargando turnos...</div>
           )}
 
           {/* Listado de turnos de todos los pacientes */}
@@ -975,15 +1052,15 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   }`}
                 >
                   <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center shrink-0">
+                    <div className={`w-12 h-12 rounded-full bg-blue-600/20 ${azulEnTarjeta} font-bold flex items-center justify-center shrink-0`}>
                       {turno.paciente.split(' ').map(n => n[0]).join('').slice(0, 2)}
                     </div>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold uppercase tracking-wider text-blue-400">{turno.especialidad}</span>
+                        <span className={`text-xs font-bold uppercase tracking-wider ${azulEnTarjeta}`}>{turno.especialidad}</span>
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${badgeColor}`}>{turno.estado}</span>
                       </div>
-                      <h3 className="font-bold text-lg">{turno.paciente}</h3>
+                      <h2 className="font-bold text-lg">{turno.paciente}</h2>
                       <p className={`text-sm mt-1 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>{turno.medico}</p>
                       <p className={`text-xs mt-0.5 ${altoContraste ? 'text-black' : 'text-slate-400'}`}>📅 {turno.fecha} — <strong>{turno.hora}</strong></p>
                     </div>
@@ -1026,7 +1103,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               )}
 
               {cargandoMedicosAdmin && (
-                <div role="status" className="text-slate-400 text-sm py-4">Cargando médicos...</div>
+                <div role="status" className={`${textoApoyo} text-sm py-4`}>Cargando médicos...</div>
               )}
 
               {!cargandoMedicosAdmin && !errorMedicosAdmin && medicosAdmin.length === 0 && (
@@ -1041,9 +1118,9 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   <table className="w-full text-left" style={{ fontSize: modoAdultoMayor ? '16px' : '14px' }}>
                     <thead>
                       <tr className={`border-b ${altoContraste ? 'border-black' : 'border-slate-700'}`}>
-                        {['Médico', 'Email', 'DNI', 'Matrícula', 'Consultorio', 'Duración', 'Especialidades', 'Estado', ''].map((col) => (
+                        {['Médico', 'Email', 'DNI', 'Matrícula', 'Consultorio', 'Duración', 'Especialidades', 'Estado', 'Acciones'].map((col) => (
                           <th key={col} className={`px-4 py-3 font-semibold uppercase tracking-wider ${altoContraste ? 'text-black' : 'text-slate-400'}`} style={{ fontSize: modoAdultoMayor ? '13px' : '11px' }}>
-                            {col}
+                            {col === 'Acciones' ? <span className="sr-only">Acciones</span> : col}
                           </th>
                         ))}
                       </tr>
@@ -1138,14 +1215,14 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
         // ==========================================
         // VISTA: "Agenda del médico"
         // ==========================================
-        <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+        <main id="contenido-principal" tabIndex={-1} className="max-w-5xl mx-auto px-4 py-8 space-y-6">
           <div>
             <h1 className="font-bold" style={{ fontSize: modoAdultoMayor ? '32px' : '24px' }}>Mi agenda</h1>
-            <p className="text-slate-400 text-sm">{turnosHoyMedico.length} turno{turnosHoyMedico.length === 1 ? '' : 's'} hoy</p>
+            <p className={`${textoApoyo} text-sm`}>{turnosHoyMedico.length} turno{turnosHoyMedico.length === 1 ? '' : 's'} hoy</p>
           </div>
 
           {cargandoAgenda && (
-            <div role="status" className="text-slate-400 text-sm py-4">Cargando tu agenda...</div>
+            <div role="status" className={`${textoApoyo} text-sm py-4`}>Cargando tu agenda...</div>
           )}
 
           {errorAgenda && !cargandoAgenda && (
@@ -1183,7 +1260,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   }`}
                 >
                   <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center shrink-0">
+                    <div className={`w-12 h-12 rounded-full bg-blue-600/20 ${azulEnTarjeta} font-bold flex items-center justify-center shrink-0`}>
                       {turno.paciente.split(' ').map(n => n[0]).join('').slice(0, 2)}
                     </div>
                     <div>
@@ -1193,7 +1270,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                           <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700">✓ Paciente confirmó</span>
                         )}
                       </div>
-                      <h3 className="font-bold text-lg">{turno.paciente}</h3>
+                      <h2 className="font-bold text-lg">{turno.paciente}</h2>
                       <p className={`text-sm mt-1 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>📅 {turno.fecha} — <strong>{turno.hora}</strong></p>
                       <p className={`text-xs mt-0.5 ${altoContraste ? 'text-black' : 'text-slate-400'}`}>{turno.email} · {turno.telefono} · {turno.obraSocial}</p>
                     </div>
@@ -1239,10 +1316,10 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
         // ==========================================
         // VISTA: "Mi disponibilidad" (franjas horarias del médico)
         // ==========================================
-        <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+        <main id="contenido-principal" tabIndex={-1} className="max-w-3xl mx-auto px-4 py-8 space-y-6">
           <div>
             <h1 className="font-bold" style={{ fontSize: modoAdultoMayor ? '32px' : '24px' }}>Mi disponibilidad</h1>
-            <p className="text-slate-400 text-sm">Definí los días y horarios en los que atendés. Los pacientes solo van a poder reservar turnos dentro de estas franjas.</p>
+            <p className={`${textoApoyo} text-sm`}>Definí los días y horarios en los que atendés. Los pacientes solo van a poder reservar turnos dentro de estas franjas.</p>
           </div>
 
           <form onSubmit={agregarDisponibilidad} className={`p-5 rounded-xl border space-y-4 ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800'}`}>
@@ -1253,7 +1330,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             )}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div>
-                <label htmlFor="disponibilidad-dia" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Día</label>
+                <label htmlFor="disponibilidad-dia" className={`block text-xs font-semibold uppercase tracking-wider ${textoEnTarjeta} mb-1`}>Día</label>
                 <select id="disponibilidad-dia"
                   value={nuevaDia}
                   onChange={(e) => setNuevaDia(e.target.value)}
@@ -1265,7 +1342,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 </select>
               </div>
               <div>
-                <label htmlFor="disponibilidad-desde" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Desde</label>
+                <label htmlFor="disponibilidad-desde" className={`block text-xs font-semibold uppercase tracking-wider ${textoEnTarjeta} mb-1`}>Desde</label>
                 <input id="disponibilidad-desde"
                   type="time"
                   value={nuevaHoraInicio}
@@ -1274,7 +1351,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                 />
               </div>
               <div>
-                <label htmlFor="disponibilidad-hasta" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Hasta</label>
+                <label htmlFor="disponibilidad-hasta" className={`block text-xs font-semibold uppercase tracking-wider ${textoEnTarjeta} mb-1`}>Hasta</label>
                 <input id="disponibilidad-hasta"
                   type="time"
                   value={nuevaHoraFin}
@@ -1295,7 +1372,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           </form>
 
           {cargandoDisponibilidad && (
-            <div role="status" className="text-slate-400 text-sm py-4">Cargando tu disponibilidad...</div>
+            <div role="status" className={`${textoApoyo} text-sm py-4`}>Cargando tu disponibilidad...</div>
           )}
 
           {errorDisponibilidad && !cargandoDisponibilidad && (
@@ -1322,7 +1399,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   </span>
                   <button
                     onClick={() => eliminarFranja(f.idDisponibilidad)}
-                    className="text-red-400 hover:text-red-300 text-xs font-semibold"
+                    className={`${claseEliminar} text-xs font-semibold min-h-[32px] px-2`}
                   >
                     Eliminar
                   </button>
@@ -1336,7 +1413,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           {/* ========================================== */}
           <div className="pt-4 border-t border-slate-800">
             <h2 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '22px' : '18px' }}>Ausencias puntuales</h2>
-            <p className="text-slate-400 text-sm mb-4">Para vacaciones o un día suelto que no atendés, aunque caiga en tu franja habitual. Los pacientes no van a poder reservar en estas fechas.</p>
+            <p className={`${textoApoyo} text-sm mb-4`}>Para vacaciones o un día suelto que no atendés, aunque caiga en tu franja habitual. Los pacientes no van a poder reservar en estas fechas.</p>
 
             <form onSubmit={agregarAusencia} className={`p-5 rounded-xl border space-y-4 ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800'}`}>
               {errorNuevaAusencia && (
@@ -1346,7 +1423,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label htmlFor="ausencia-desde" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Desde</label>
+                  <label htmlFor="ausencia-desde" className={`block text-xs font-semibold uppercase tracking-wider ${textoEnTarjeta} mb-1`}>Desde</label>
                   <input id="ausencia-desde"
                     type="date"
                     value={nuevaAusenciaDesde}
@@ -1356,7 +1433,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   />
                 </div>
                 <div>
-                  <label htmlFor="ausencia-hasta" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Hasta</label>
+                  <label htmlFor="ausencia-hasta" className={`block text-xs font-semibold uppercase tracking-wider ${textoEnTarjeta} mb-1`}>Hasta</label>
                   <input id="ausencia-hasta"
                     type="date"
                     value={nuevaAusenciaHasta}
@@ -1366,7 +1443,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   />
                 </div>
                 <div>
-                  <label htmlFor="ausencia-motivo" className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Motivo (opcional)</label>
+                  <label htmlFor="ausencia-motivo" className={`block text-xs font-semibold uppercase tracking-wider ${textoEnTarjeta} mb-1`}>Motivo (opcional)</label>
                   <input id="ausencia-motivo"
                     type="text"
                     value={nuevaAusenciaMotivo}
@@ -1387,7 +1464,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
             </form>
 
             {cargandoAusencias && (
-              <div role="status" className="text-slate-400 text-sm py-4">Cargando tus ausencias...</div>
+              <div role="status" className={`${textoApoyo} text-sm py-4`}>Cargando tus ausencias...</div>
             )}
 
             {errorAusencias && !cargandoAusencias && (
@@ -1405,11 +1482,11 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   >
                     <span className="font-medium">
                       {formatearFechaAusencia(a.fechaInicio)} a {formatearFechaAusencia(a.fechaFin)}
-                      {a.motivo && <span className="text-slate-400 font-normal"> — {a.motivo}</span>}
+                      {a.motivo && <span className={`${textoEnTarjeta} font-normal`}> — {a.motivo}</span>}
                     </span>
                     <button
                       onClick={() => eliminarAusenciaHandler(a.idAusencia)}
-                      className="text-red-400 hover:text-red-300 text-xs font-semibold"
+                      className={`${claseEliminar} text-xs font-semibold min-h-[32px] px-2`}
                     >
                       Eliminar
                     </button>
@@ -1420,11 +1497,11 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           </div>
         </main>
       ) : vistaActual === 'mis-turnos' ? (
-        <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+        <main id="contenido-principal" tabIndex={-1} className="max-w-5xl mx-auto px-4 py-8 space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="font-bold" style={{ fontSize: modoAdultoMayor ? '32px' : '24px' }}>Mis turnos</h1>
-              <p className="text-slate-400 text-sm">{turnosActivos.length} turno{turnosActivos.length === 1 ? '' : 's'} activo{turnosActivos.length === 1 ? '' : 's'}</p>
+              <p className={`${textoApoyo} text-sm`}>{turnosActivos.length} turno{turnosActivos.length === 1 ? '' : 's'} activo{turnosActivos.length === 1 ? '' : 's'}</p>
             </div>
             <button
               onClick={() => setMostrarModalTurno(true)}
@@ -1456,7 +1533,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           </div>
 
           {cargandoTurnos && (
-            <div role="status" className="text-slate-400 text-sm py-4">Cargando tus turnos...</div>
+            <div role="status" className={`${textoApoyo} text-sm py-4`}>Cargando tus turnos...</div>
           )}
 
           {errorTurnos && !cargandoTurnos && (
@@ -1494,15 +1571,15 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   }`}
                 >
                   <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center shrink-0">
+                    <div className={`w-12 h-12 rounded-full bg-blue-600/20 ${azulEnTarjeta} font-bold flex items-center justify-center shrink-0`}>
                       {turno.medico.split(' ').map(n => n[0]).join('').slice(0, 2)}
                     </div>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold uppercase tracking-wider text-blue-400">{turno.especialidad}</span>
+                        <span className={`text-xs font-bold uppercase tracking-wider ${azulEnTarjeta}`}>{turno.especialidad}</span>
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${badgeColor}`}>{turno.estado}</span>
                       </div>
-                      <h3 className="font-bold text-lg">{turno.medico}</h3>
+                      <h2 className="font-bold text-lg">{turno.medico}</h2>
                       <p className={`text-sm mt-1 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>📅 {turno.fecha} — <strong>{turno.hora}</strong></p>
                       <p className={`text-xs mt-0.5 ${altoContraste ? 'text-black' : 'text-slate-400'}`}>📍 {turno.consultorio}</p>
                     </div>
@@ -1552,14 +1629,14 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
         // ==========================================
         // VISTA: "Historial" (turnos finalizados y cancelados)
         // ==========================================
-        <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+        <main id="contenido-principal" tabIndex={-1} className="max-w-5xl mx-auto px-4 py-8 space-y-6">
           <div>
             <h1 className="font-bold" style={{ fontSize: modoAdultoMayor ? '32px' : '24px' }}>Historial</h1>
-            <p className="text-slate-400 text-sm">{historialTurnos.length} turno{historialTurnos.length === 1 ? '' : 's'} en tu historial</p>
+            <p className={`${textoApoyo} text-sm`}>{historialTurnos.length} turno{historialTurnos.length === 1 ? '' : 's'} en tu historial</p>
           </div>
 
           {cargandoTurnos && (
-            <div role="status" className="text-slate-400 text-sm py-4">Cargando tu historial...</div>
+            <div role="status" className={`${textoApoyo} text-sm py-4`}>Cargando tu historial...</div>
           )}
 
           {errorTurnos && !cargandoTurnos && (
@@ -1586,15 +1663,15 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                     altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 text-[#F1F5F9]'
                   }`}
                 >
-                  <div className="w-12 h-12 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center shrink-0">
+                  <div className={`w-12 h-12 rounded-full bg-blue-600/20 ${azulEnTarjeta} font-bold flex items-center justify-center shrink-0`}>
                     {turno.medico.split(' ').map(n => n[0]).join('').slice(0, 2)}
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-bold uppercase tracking-wider text-blue-400">{turno.especialidad}</span>
+                      <span className={`text-xs font-bold uppercase tracking-wider ${azulEnTarjeta}`}>{turno.especialidad}</span>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${badgeColor}`}>{turno.estado}</span>
                     </div>
-                    <h3 className="font-bold text-lg">{turno.medico}</h3>
+                    <h2 className="font-bold text-lg">{turno.medico}</h2>
                     <p className={`text-sm mt-1 ${altoContraste ? 'text-black' : 'text-slate-300'}`}>📅 {turno.fecha} — <strong>{turno.hora}</strong></p>
                     <p className={`text-xs mt-0.5 ${altoContraste ? 'text-black' : 'text-slate-400'}`}>📍 {turno.consultorio}</p>
                   </div>
@@ -1607,9 +1684,9 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
         // ==========================================
         // VISTA 2: "Dashboard Principal"
         // ==========================================
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <main id="contenido-principal" tabIndex={-1} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           <div>
-            <p className={`${altoContraste ? 'text-black font-medium' : 'text-[#64748B]'}`} style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>{saludoSegunHora()}</p>
+            <p className={claseSaludo} style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>{saludoSegunHora()}</p>
             <h1 className="font-bold" style={{ fontSize: modoAdultoMayor ? '32px' : '24px' }}>{usuario.nombre}</h1>
           </div>
 
@@ -1618,20 +1695,20 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
               altoContraste ? 'bg-white border-black text-black font-semibold' : 'bg-[#EFF6FF] border-[#2563EB]/30 text-[#2563EB]'
             }`} style={{ fontSize: modoAdultoMayor ? '18px' : '14px' }}>
               <span>🔔 Recordatorio: tenés un turno en {diasHastaProximo} día{diasHastaProximo === 1 ? '' : 's'} con {proximoTurno.medico}.</span>
-              <button onClick={() => setAlertaActiva(false)} aria-label="Cerrar recordatorio" className="font-bold hover:opacity-70" style={{ fontSize: modoAdultoMayor ? '22px' : '18px' }}>&times;</button>
+              <button onClick={() => setAlertaActiva(false)} aria-label="Cerrar recordatorio" className="font-bold hover:opacity-70 w-8 h-8 inline-flex items-center justify-center" style={{ fontSize: modoAdultoMayor ? '22px' : '18px' }}>&times;</button>
             </div>
           )}
 
           {esPaciente && cargandoTurnos && (
-            <div role="status" className="text-slate-400 text-sm">Cargando tus turnos...</div>
+            <div role="status" className={`${textoApoyo} text-sm`}>Cargando tus turnos...</div>
           )}
 
           {esPaciente && proximoTurno && (
             <div className={`p-6 rounded-2xl shadow-xl relative overflow-hidden ${
-              altoContraste ? 'bg-white border-2 border-black text-black' : 'bg-[#2563EB] text-white'
+              altoContraste ? 'bg-white border-2 border-black text-black' : 'bg-[#1D4ED8] text-white'
             }`}>
               <div className={`absolute top-4 right-4 font-semibold px-2.5 py-1 rounded-full ${
-                altoContraste ? 'bg-black text-white' : 'bg-white/20'
+                altoContraste ? 'bg-black text-white' : 'bg-black/25'
               }`} style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>
                 Próximo turno en {diasHastaProximo} día{diasHastaProximo === 1 ? '' : 's'}
               </div>
@@ -1658,27 +1735,27 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
 
           {esPaciente && (
             <div>
-              <h3 className="font-bold mb-4" style={{ fontSize: modoAdultoMayor ? '24px' : '18px' }}>¿Qué querés hacer hoy?</h3>
+              <h2 className="font-bold mb-4" style={{ fontSize: modoAdultoMayor ? '24px' : '18px' }}>¿Qué querés hacer hoy?</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div onClick={() => setMostrarModalTurno(true)} className={`p-5 rounded-xl border shadow-sm cursor-pointer transition ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 hover:border-blue-500'}`}>
-                  <div className="w-10 h-10 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold mb-3">📅</div>
-                  <h4 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '20px' : '16px' }}>Solicitar turno</h4>
-                  <p className="text-slate-400" style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>Reserva una nueva cita médica</p>
+                <div className={`p-5 rounded-xl border shadow-sm cursor-pointer relative transition ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 hover:border-blue-500'} ${anilloFoco}`}>
+                  <div className={`w-10 h-10 rounded-lg bg-blue-500/20 ${azulEnTarjeta} flex items-center justify-center font-bold mb-3`}>📅</div>
+                  <h3 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '20px' : '16px' }}><button type="button" onClick={() => setMostrarModalTurno(true)} className="text-left after:absolute after:inset-0 after:content-['']">Solicitar turno</button></h3>
+                  <p className={textoEnTarjeta} style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>Reserva una nueva cita médica</p>
                 </div>
 
-                <div onClick={() => setVistaActual('mis-turnos')} className={`p-5 rounded-xl border shadow-sm cursor-pointer transition relative ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 hover:border-blue-500'}`}>
+                <div className={`p-5 rounded-xl border shadow-sm cursor-pointer transition relative ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 hover:border-blue-500'} ${anilloFoco}`}>
                   {turnosActivos.length > 0 && (
                     <span className="absolute top-4 right-4 bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-bold">{turnosActivos.length}</span>
                   )}
                   <div className="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold mb-3">📋</div>
-                  <h4 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '20px' : '16px' }}>Mis turnos</h4>
-                  <p className="text-slate-400" style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>Revisá, cancelá o reprogramá tus citas</p>
+                  <h3 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '20px' : '16px' }}><button type="button" onClick={() => setVistaActual('mis-turnos')} className="text-left after:absolute after:inset-0 after:content-['']">Mis turnos{turnosActivos.length > 0 && <span className="sr-only"> ({turnosActivos.length} activo{turnosActivos.length === 1 ? '' : 's'})</span>}</button></h3>
+                  <p className={textoEnTarjeta} style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>Revisá, cancelá o reprogramá tus citas</p>
                 </div>
 
-                <div onClick={() => setVistaActual('historial')} className={`p-5 rounded-xl border shadow-sm cursor-pointer transition ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 hover:border-blue-500'}`}>
+                <div className={`p-5 rounded-xl border shadow-sm cursor-pointer relative transition ${altoContraste ? 'bg-white border-black text-black' : 'border-slate-700 bg-slate-800 hover:border-blue-500'} ${anilloFoco}`}>
                   <div className="w-10 h-10 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold mb-3">📁</div>
-                  <h4 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '20px' : '16px' }}>Historial</h4>
-                  <p className="text-slate-400" style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>Turnos finalizados y cancelados</p>
+                  <h3 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '20px' : '16px' }}><button type="button" onClick={() => setVistaActual('historial')} className="text-left after:absolute after:inset-0 after:content-['']">Historial</button></h3>
+                  <p className={textoEnTarjeta} style={{ fontSize: modoAdultoMayor ? '15px' : '12px' }}>Turnos finalizados y cancelados</p>
                 </div>
               </div>
             </div>
@@ -1691,7 +1768,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
           )}
 
           {esMedico && (
-            <div className={`p-6 rounded-2xl shadow-xl relative overflow-hidden ${altoContraste ? 'bg-white border-2 border-black text-black' : 'bg-[#2563EB] text-white'}`}>
+            <div className={`p-6 rounded-2xl shadow-xl relative overflow-hidden ${altoContraste ? 'bg-white border-2 border-black text-black' : 'bg-[#1D4ED8] text-white'}`}>
               <p className={`uppercase tracking-wider font-semibold mb-1 ${altoContraste ? 'text-black' : 'text-blue-200'}`} style={{ fontSize: modoAdultoMayor ? '16px' : '12px' }}>Hoy</p>
               <h2 className="font-bold mb-1" style={{ fontSize: modoAdultoMayor ? '30px' : '24px' }}>
                 {turnosHoyMedico.length} turno{turnosHoyMedico.length === 1 ? '' : 's'} agendado{turnosHoyMedico.length === 1 ? '' : 's'}
