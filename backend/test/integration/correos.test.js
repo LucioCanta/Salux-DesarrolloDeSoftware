@@ -108,6 +108,47 @@ test.describe('recuperar contraseña', () => {
   });
 });
 
+test.describe('no se puede averiguar qué cuentas existen midiendo la respuesta', () => {
+  // En vez de medir milisegundos (inestable), se cuentan las operaciones que hace la base:
+  // si son las mismas, el tiempo de respuesta no depende de que la cuenta exista.
+  let grabando = null;
+  prisma.$use(async (params, next) => {
+    if (grabando) grabando.push(params.action);
+    return next(params);
+  });
+  const operacionesDe = async (peticion) => {
+    grabando = [];
+    await peticion();
+    const hechas = grabando;
+    grabando = null;
+    return hechas.map((a) => (a === 'updateMany' ? 'update' : a)); // update y updateMany cuestan lo mismo
+  };
+
+  test('recuperar contraseña: cuenta real e inexistente hacen las mismas operaciones', async () => {
+    const real = await crearUsuario({ email: 'real.tiempo@correo.test' });
+    const conCuenta = await operacionesDe(() => pedirRecuperacion(real.email));
+    const sinCuenta = await operacionesDe(() => pedirRecuperacion('nadie.tiempo@correo.test'));
+    assert.ok(conCuenta.length >= 4, `operaciones: ${conCuenta.join(', ')}`);
+    assert.deepEqual(sinCuenta, conCuenta);
+  });
+
+  test('reenviar verificación: cuenta sin verificar e inexistente hacen las mismas operaciones', async () => {
+    const real = await crearUsuario({ email: 'sinverificar.tiempo@correo.test', extra: { emailVerificado: false } });
+    const conCuenta = await operacionesDe(() => post('/api/auth/reenviar-verificacion', { email: real.email }));
+    const sinCuenta = await operacionesDe(() => post('/api/auth/reenviar-verificacion', { email: 'nadie.tiempo@correo.test' }));
+    assert.deepEqual(sinCuenta, conCuenta);
+  });
+
+  test('también cuando el pedido cae dentro de la espera (el caso más barato para el atacante)', async () => {
+    const real = await crearUsuario({ email: 'espera.tiempo@correo.test' });
+    await pedirRecuperacion(real.email);
+    await pedirRecuperacion('nadie.espera@correo.test');
+    const conCuenta = await operacionesDe(() => pedirRecuperacion(real.email));
+    const sinCuenta = await operacionesDe(() => pedirRecuperacion('nadie.espera@correo.test'));
+    assert.deepEqual(sinCuenta, conCuenta, `real: ${conCuenta.join(',')} / inexistente: ${sinCuenta.join(',')}`);
+  });
+});
+
 test.describe('presupuesto diario de correos abusables', () => {
   test('al agotarse, dejan de salir esos correos pero los esenciales (turnos) siguen saliendo', async () => {
     process.env.CORREOS_ABUSABLES_POR_DIA = '2';

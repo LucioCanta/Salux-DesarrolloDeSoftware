@@ -1,4 +1,5 @@
 const prisma = require('../config/prisma');
+const { registrarError } = require('../utils/registrarError');
 
 // Todas las rutas de este controller son para el médico logueado, así que
 // resolvemos su idMedico a partir del usuario del token en cada una.
@@ -30,7 +31,7 @@ const crearDisponibilidad = async (req, res) => {
 
     res.status(201).json({ ok: true, message: 'Franja horaria agregada', data: nueva });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     if (error.code === 'P2002') {
       return res.status(409).json({ ok: false, message: 'Ya tenés esa franja horaria cargada' });
     }
@@ -52,7 +53,7 @@ const obtenerMisDisponibilidades = async (req, res) => {
 
     res.json({ ok: true, data: disponibilidades });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -81,7 +82,7 @@ const eliminarDisponibilidad = async (req, res) => {
 
     res.json({ ok: true, message: 'Franja horaria eliminada' });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -117,7 +118,7 @@ const obtenerDisponibilidadDeMedico = async (req, res) => {
 
     res.json({ ok: true, data: { duracionTurnoMinutos: medico.duracionTurnoMinutos, disponibilidades, ausencias } });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -151,7 +152,7 @@ const crearAusencia = async (req, res) => {
 
     res.status(201).json({ ok: true, message: 'Ausencia registrada', data: nueva });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -170,7 +171,7 @@ const obtenerMisAusencias = async (req, res) => {
 
     res.json({ ok: true, data: ausencias });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -199,7 +200,7 @@ const eliminarAusencia = async (req, res) => {
 
     res.json({ ok: true, message: 'Ausencia eliminada' });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };

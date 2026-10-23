@@ -58,6 +58,15 @@ Para tener médicos y pacientes de demostración (opcional, **no** con datos rea
 
 Al cerrar la terminal las variables desaparecen (no queda nada guardado).
 
+### Actualizar una app ya desplegada (cuando hay migraciones nuevas)
+
+Si una actualización trae migraciones nuevas (carpetas nuevas en `backend/prisma/migrations/`), el orden importa:
+
+1. **Primero la base**: con las dos variables de Supabase en la terminal (ver arriba), `npx prisma migrate deploy` desde `backend/`.
+2. **Después el código**: mergear a `main` (Vercel despliega solo).
+
+Las migraciones son **aditivas** (columnas nuevas, nulas): el código viejo sigue funcionando con la base ya migrada, pero el código nuevo **falla** si la base todavía no tiene las columnas. Por eso nunca al revés.
+
 > Después de migrar, en Supabase → **Table Editor** vas a ver las tablas con el aviso "RLS enabled": es correcto y es lo que impide que la API pública de Supabase lea tus datos.
 
 ## 3. Vercel

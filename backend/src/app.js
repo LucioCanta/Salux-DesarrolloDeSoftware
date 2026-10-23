@@ -11,6 +11,7 @@ const rateLimit = require('express-rate-limit');
 const prisma = require('./config/prisma');
 const { opcionesDeStore } = require('./config/rateLimitStore');
 const { validarEntorno } = require('./config/validarEntorno');
+const { registrarError } = require('./utils/registrarError');
 
 const authRoutes = require('./routes/auth.routes');
 const especialidadRoutes = require('./routes/especialidad.routes');
@@ -48,7 +49,9 @@ app.use(
   cors({
     // Con credentials:true el navegador NO permite origin:"*" — hace falta
     // una lista explícita, porque el refresh token viaja en una cookie.
-    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : 'http://localhost:5173',
+    // Se recortan los espacios ("https://a.com, https://b.com"): sin eso el segundo origen
+    // nunca coincidía y el CORS fallaba en silencio.
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean) : 'http://localhost:5173',
     credentials: true,
   })
 );
@@ -135,7 +138,7 @@ app.use((req, res) => {
 
 // Manejador de errores centralizado (red de seguridad ante errores no atrapados)
 app.use((err, req, res, next) => {
-  console.error(err);
+  registrarError(err);
   res.status(err.status || 500).json({
     ok: false,
     error: NODE_ENV === 'production' ? 'Error interno del servidor' : err.message,

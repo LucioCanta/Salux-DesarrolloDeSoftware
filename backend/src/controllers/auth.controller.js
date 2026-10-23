@@ -7,6 +7,7 @@ const { problemasDeContrasena } = require('../utils/politicaContrasena');
 const { permitirCorreo, avisarOmitido, huella } = require('../utils/limiteCorreos');
 const { incrementar, leer, reiniciar } = require('../utils/contadores');
 const { segundoPlano } = require('../utils/segundoPlano');
+const { registrarError } = require('../utils/registrarError');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const VERIFICACION_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
@@ -154,6 +155,7 @@ async function prepararVerificacion(usuario) {
   const control = await permitirCorreo('verificacion', usuario.email);
   if (!control.permitido) {
     avisarOmitido('verificacion', control.motivo);
+    await operacionVacia();
     return null;
   }
   const tokenPlano = crypto.randomBytes(32).toString('hex');
@@ -175,8 +177,12 @@ async function enviarVerificacion(usuario) {
 // respuesta tarda lo mismo y no sirve para averiguar qué correos están registrados.
 async function igualarTiempo(tipo, email) {
   await permitirCorreo(tipo, email, { simulado: true });
-  await prisma.usuario.updateMany({ where: { idUsuario: -1 }, data: { verificacionToken: null } });
+  await operacionVacia();
 }
+
+// Un update que no modifica nada: cuesta como el que genera un token, para que una
+// cuenta real que cae dentro de la espera no responda más rápido que una inexistente.
+const operacionVacia = () => prisma.usuario.updateMany({ where: { idUsuario: -1 }, data: { verificacionToken: null } });
 
 // Manda un correo en segundo plano solo si los límites lo permiten.
 async function enviarSiPermitido(tipo, email, enviar) {
@@ -255,7 +261,7 @@ const register = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     // Carrera entre dos registros simultáneos con el mismo email/dni
     if (error.code === 'P2002') {
       if (requiereVerificacionEmail()) {
@@ -280,7 +286,7 @@ const verificarEmail = async (req, res) => {
     });
     res.json({ ok: true, message: 'Email verificado. Ya podés iniciar sesión.' });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -299,7 +305,7 @@ const reenviarVerificacion = async (req, res) => {
       message: 'Si la cuenta existe y falta verificarla, te enviamos un nuevo enlace. Si ya pediste uno hace poco, esperá unos minutos antes de pedir otro.'
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -369,7 +375,7 @@ const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -456,7 +462,7 @@ const refresh = async (req, res) => {
       usuario: usuarioDeSesion(usuario, rol)
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -490,7 +496,7 @@ const logoutTodas = async (req, res) => {
     res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/auth' });
     res.json({ ok: true, message: 'Cerraste sesión en todos tus dispositivos' });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -514,7 +520,7 @@ const obtenerPerfil = async (req, res) => {
       usuario: serializarPerfil(usuario, rol)
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -538,7 +544,7 @@ const actualizarPerfil = async (req, res) => {
       usuario: serializarPerfil(usuario, req.usuario.rol)
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -593,7 +599,7 @@ const cambiarContrasena = async (req, res) => {
       usuario: usuarioDeSesion(actualizado, rol)
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -627,6 +633,7 @@ const olvideContrasena = async (req, res) => {
       // Pidió otro enlace demasiado pronto: no se genera un token nuevo, así el
       // enlace que ya recibió sigue siendo válido (y nadie puede anularlo repitiendo el pedido).
       avisarOmitido('recuperacion', control.motivo);
+      await operacionVacia();
     } else {
       await igualarTiempo('recuperacion', email);
     }
@@ -636,7 +643,7 @@ const olvideContrasena = async (req, res) => {
       message: 'Si ese email está registrado, te enviamos un enlace para recuperar tu contraseña. Si ya pediste uno hace poco, esperá unos minutos antes de pedir otro.'
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -670,7 +677,7 @@ const resetearContrasena = async (req, res) => {
 
     res.json({ ok: true, message: 'Contraseña actualizada. Ya podés iniciar sesión.' });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };

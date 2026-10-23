@@ -1,6 +1,7 @@
 const prisma = require('../config/prisma');
 const { emailTurnoCreado, emailTurnoConfirmado, emailTurnoCancelado } = require('../utils/email');
 const { diaCalendarioUTC, diaSemanaYMinutosArgentina, formatearFechaHora } = require('../utils/fechas');
+const { registrarError } = require('../utils/registrarError');
 
 // Valida que `inicio` sea un horario reservable para `medico`: activo, fuera
 // de sus ausencias puntuales, dentro de su disponibilidad semanal (si
@@ -166,7 +167,7 @@ const crearTurno = async (req, res) => {
     }).catch(() => {});
 
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     // Red de seguridad ante una carrera entre dos reservas simultáneas que
     // los chequeos de arriba no llegaron a atajar a tiempo.
     if (error.code === 'P2002') {
@@ -215,7 +216,7 @@ const obtenerMisTurnos = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -313,7 +314,7 @@ const actualizarEstadoTurno = async (req, res) => {
     }
 
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     if (error.code === 'P2025') {
       return res.status(404).json({ ok: false, message: 'Turno no encontrado' });
     }
@@ -392,7 +393,7 @@ const reprogramarTurno = async (req, res) => {
 
     res.json({ ok: true, message: 'Turno reprogramado con éxito', data: turnoActualizado });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     if (error.code === 'P2002') {
       return res.status(409).json({ ok: false, message: 'Ese horario ya no está disponible' });
     }
@@ -436,7 +437,7 @@ const confirmarAsistencia = async (req, res) => {
 
     res.json({ ok: true, message: 'Confirmaste tu asistencia', data: turnoActualizado });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -485,7 +486,7 @@ const obtenerTurnosMedico = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
@@ -516,7 +517,7 @@ const obtenerTodosLosTurnos = async (req, res) => {
       data: turnos
     });
   } catch (error) {
-    console.error(error);
+    registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
