@@ -10,3 +10,17 @@
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+/* Respeta la preferencia "reducir movimiento" del sistema operativo (WCAG 2.3.3). El
+   interruptor del menú de accesibilidad sigue funcionando y, si la persona nunca lo
+   tocó, arranca prendido cuando el sistema lo pide. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

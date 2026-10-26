@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from './api';
 import { useCampoInvalido, campoDelError } from './campos';
 
-const inputClase = 'w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 text-sm';
+const inputClase = 'w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-400 text-sm';
 const labelClase = 'block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1';
 
 // Pantalla bloqueante para cuentas creadas por un administrador: tienen una
@@ -13,6 +13,10 @@ function CambioContrasenaObligatorio({ usuario, onCambiada, onLogout }) {
   const [confirmar, setConfirmar] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    document.title = 'Elegí tu contraseña — Salux';
+  }, []);
   const { marcar, limpiar, atributos } = useCampoInvalido();
 
   const guardar = async (e) => {
@@ -37,7 +41,7 @@ function CambioContrasenaObligatorio({ usuario, onCambiada, onLogout }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+    <main className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <form onSubmit={guardar} className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-md text-slate-100 p-8 space-y-4">
         <div>
           <h1 className="font-bold text-xl">Elegí tu contraseña</h1>
@@ -55,7 +59,7 @@ function CambioContrasenaObligatorio({ usuario, onCambiada, onLogout }) {
         <div>
           <label htmlFor="cambio-contrasena-nueva" className={labelClase}>Contraseña nueva</label>
           <input id="cambio-contrasena-nueva" {...atributos('cambio-contrasena-nueva', { error: 'cambio-error', ayuda: 'cambio-contrasena-nueva-ayuda' })} type="password" value={nueva} onChange={(e) => setNueva(e.target.value)} required minLength={10} autoComplete="new-password" placeholder="Mínimo 10 caracteres" className={inputClase} />
-          <p id="cambio-contrasena-nueva-ayuda" className="text-slate-500 text-xs mt-1">Mínimo 10 caracteres, con letras y números. No uses una contraseña común ni tus datos personales.</p>
+          <p id="cambio-contrasena-nueva-ayuda" className="text-slate-400 text-xs mt-1">Mínimo 10 caracteres, con letras y números. No uses una contraseña común ni tus datos personales.</p>
         </div>
         <div>
           <label htmlFor="cambio-confirmar-contrasena" className={labelClase}>Repetí la contraseña nueva</label>
@@ -69,7 +73,7 @@ function CambioContrasenaObligatorio({ usuario, onCambiada, onLogout }) {
           Cerrar sesión
         </button>
       </form>
-    </div>
+    </main>
   );
 }
 

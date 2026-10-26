@@ -48,14 +48,14 @@ function ReprogramarTurnoModal({ turno, onClose, onReprogramado }) {
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg text-slate-100 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <h2 id={tituloId} className="font-bold text-lg">Reprogramar turno</h2>
-          <button onClick={onClose} aria-label="Cerrar" className="text-slate-400 hover:text-slate-200 text-xl leading-none">&times;</button>
+          <button onClick={onClose} aria-label="Cerrar" className="text-slate-400 hover:text-slate-200 text-xl leading-none w-10 h-10 -mr-2 inline-flex items-center justify-center rounded-lg">&times;</button>
         </div>
 
         <div className="px-6 py-5 space-y-5">
           <div className="px-4 py-3 rounded-lg bg-slate-800 border border-slate-700 text-sm">
             <p className="font-medium">{turno.medico}</p>
             <p className="text-slate-400">{turno.especialidad}</p>
-            <p className="text-slate-500 text-xs mt-1">Turno actual: {turno.fecha} — {turno.hora}</p>
+            <p className="text-slate-400 text-xs mt-1">Turno actual: {turno.fecha} — {turno.hora}</p>
           </div>
 
           {cargandoDisponibilidad && <p role="status" className="text-slate-400 text-sm">Cargando horarios disponibles...</p>}

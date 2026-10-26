@@ -3,7 +3,7 @@ import { api } from './api';
 import { useCampoInvalido, campoDelError } from './campos';
 import { useDialogo } from './useDialogo';
 
-const inputClase = 'w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 text-sm';
+const inputClase = 'w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-400 text-sm';
 const labelClase = 'block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1';
 
 function EditarMedicoModal({ medico, onClose, onActualizado }) {
@@ -69,7 +69,7 @@ function EditarMedicoModal({ medico, onClose, onActualizado }) {
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md text-slate-100 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <h2 id={tituloId} className="font-bold text-lg">Editar médico</h2>
-          <button onClick={onClose} aria-label="Cerrar" className="text-slate-400 hover:text-slate-200 text-xl leading-none">&times;</button>
+          <button onClick={onClose} aria-label="Cerrar" className="text-slate-400 hover:text-slate-200 text-xl leading-none w-10 h-10 -mr-2 inline-flex items-center justify-center rounded-lg">&times;</button>
         </div>
 
         <form onSubmit={guardar} className="px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto">
@@ -80,7 +80,7 @@ function EditarMedicoModal({ medico, onClose, onActualizado }) {
           <div>
             <label htmlFor="editar-medico-consultorio" className={labelClase}>Consultorio</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm pointer-events-none">Cons.</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">Cons.</span>
               <input id="editar-medico-consultorio" {...atributos('editar-medico-consultorio', { error: 'editar-medico-error' })} type="text" value={consultorio} onChange={(e) => setConsultorio(e.target.value)} placeholder="204" maxLength={10} className={`${inputClase} pl-14`} />
             </div>
           </div>
@@ -100,8 +100,8 @@ function EditarMedicoModal({ medico, onClose, onActualizado }) {
               <div className="grid grid-cols-2 gap-2">
                 {opciones.map((esp) => (
                   <label key={esp.idEspecialidad} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 text-sm cursor-pointer">
-                    <input id={`editar-medico-esp-${esp.idEspecialidad}`} type="checkbox" checked={especialidadesIds.includes(esp.idEspecialidad)} onChange={() => toggleEspecialidad(esp.idEspecialidad)} />
-                    <span className={esp.inactiva ? 'text-slate-500 line-through' : ''}>{esp.nombre}</span>
+                    <input id={`editar-medico-esp-${esp.idEspecialidad}`} className="w-5 h-5 accent-[#2563EB]" type="checkbox" checked={especialidadesIds.includes(esp.idEspecialidad)} onChange={() => toggleEspecialidad(esp.idEspecialidad)} />
+                    <span className={esp.inactiva ? 'text-slate-400 line-through' : ''}>{esp.nombre}</span>
                     {esp.inactiva && <span className="text-[10px] text-amber-400">inactiva</span>}
                   </label>
                 ))}

@@ -3,7 +3,7 @@ import { api } from './api';
 import { useDialogo } from './useDialogo';
 import { useCampoInvalido, campoDelError } from './campos';
 
-const inputClase = 'w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-500 text-sm';
+const inputClase = 'w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-slate-700 focus:ring-2 focus:ring-blue-600 focus:outline-none text-slate-200 placeholder-slate-400 text-sm';
 const labelClase = 'block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1';
 
 function AdminAltaModal({ onClose }) {
@@ -15,7 +15,7 @@ function AdminAltaModal({ onClose }) {
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={tituloId} className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg text-slate-100 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <h2 id={tituloId} className="font-bold text-lg">Agregar al sistema</h2>
-          <button onClick={onClose} aria-label="Cerrar" className="text-slate-400 hover:text-slate-200 text-xl leading-none">&times;</button>
+          <button onClick={onClose} aria-label="Cerrar" className="text-slate-400 hover:text-slate-200 text-xl leading-none w-10 h-10 -mr-2 inline-flex items-center justify-center rounded-lg">&times;</button>
         </div>
 
         <div className="flex border-b border-slate-800">
@@ -136,7 +136,7 @@ function FormEspecialidad() {
                 type="button"
                 onClick={() => eliminar(esp)}
                 disabled={eliminandoId === esp.idEspecialidad}
-                className="text-red-400 hover:text-red-300 disabled:opacity-50 text-xs font-semibold"
+                className="text-red-400 hover:text-red-300 disabled:opacity-50 text-xs font-semibold min-h-[32px] px-2"
               >
                 {eliminandoId === esp.idEspecialidad ? 'Eliminando...' : 'Eliminar'}
               </button>
@@ -295,7 +295,7 @@ function FormMedico() {
       <div>
         <label htmlFor="alta-medico-contrasena" className={labelClase}>Contraseña inicial <span className="text-red-500" aria-hidden="true">*</span></label>
         <input id="alta-medico-contrasena" {...atributos('alta-medico-contrasena', { error: 'alta-medico-error', ayuda: 'alta-medico-contrasena-ayuda' })} type="password" value={contrasena} onChange={(e) => setContrasena(e.target.value)} required minLength={10} placeholder="Mínimo 10 caracteres" className={inputClase} />
-        <p id="alta-medico-contrasena-ayuda" className="text-slate-500 text-xs mt-1">Con letras y números. El médico va a tener que cambiarla en su primer ingreso.</p>
+        <p id="alta-medico-contrasena-ayuda" className="text-slate-400 text-xs mt-1">Con letras y números. El médico va a tener que cambiarla en su primer ingreso.</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -305,7 +305,7 @@ function FormMedico() {
         <div>
           <label htmlFor="alta-medico-consultorio" className={labelClase}>Consultorio</label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm pointer-events-none">Cons.</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">Cons.</span>
             <input id="alta-medico-consultorio" {...atributos('alta-medico-consultorio', { error: 'alta-medico-error', ayuda: 'alta-medico-consultorio-ayuda' })}
               type="text"
               value={consultorio}
@@ -315,7 +315,7 @@ function FormMedico() {
               className={`${inputClase} pl-14`}
             />
           </div>
-          <p id="alta-medico-consultorio-ayuda" className="text-slate-500 text-xs mt-1">Solo el número/letra, ej: "A" o "204" — no escribas la palabra "Consultorio"</p>
+          <p id="alta-medico-consultorio-ayuda" className="text-slate-400 text-xs mt-1">Solo el número/letra, ej: "A" o "204" — no escribas la palabra "Consultorio"</p>
         </div>
       </div>
 
@@ -330,7 +330,7 @@ function FormMedico() {
           step={5}
           className={inputClase}
         />
-        <p id="alta-medico-duracion-ayuda" className="text-slate-500 text-xs mt-1">Cuánto dura cada turno de este médico. Se usa para generar los horarios disponibles en el wizard.</p>
+        <p id="alta-medico-duracion-ayuda" className="text-slate-400 text-xs mt-1">Cuánto dura cada turno de este médico. Se usa para generar los horarios disponibles en el wizard.</p>
       </div>
 
       <div>
@@ -341,7 +341,7 @@ function FormMedico() {
           <div className="grid grid-cols-2 gap-2">
             {especialidades.map((esp) => (
               <label key={esp.idEspecialidad} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 text-sm cursor-pointer">
-                <input id={`alta-medico-esp-${esp.idEspecialidad}`} type="checkbox" checked={especialidadesIds.includes(esp.idEspecialidad)} onChange={() => toggleEspecialidad(esp.idEspecialidad)} />
+                <input id={`alta-medico-esp-${esp.idEspecialidad}`} className="w-5 h-5 accent-[#2563EB]" type="checkbox" checked={especialidadesIds.includes(esp.idEspecialidad)} onChange={() => toggleEspecialidad(esp.idEspecialidad)} />
                 {esp.nombre}
               </label>
             ))}
