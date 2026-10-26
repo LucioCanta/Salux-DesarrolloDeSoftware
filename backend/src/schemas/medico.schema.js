@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { INT32_MAX } = require('../utils/ids');
 const { contrasenaSegura, validarContrasenaConContexto } = require('../utils/politicaContrasena');
 
 const crearMedicoSchema = z.object({
@@ -20,7 +21,7 @@ const crearMedicoSchema = z.object({
       .optional()
   ),
   especialidadesIds: z
-    .array(z.number().int().positive())
+    .array(z.number().int().positive().max(INT32_MAX))
     .min(1, 'Debe indicar al menos una especialidad'),
   // Cuánto dura cada turno de este médico. Opcional: si no se manda, Prisma
   // usa el default de 30 minutos.
@@ -32,6 +33,8 @@ const crearMedicoSchema = z.object({
 
 const cambiarEstadoMedicoSchema = z.object({
   activo: z.boolean(),
+  // Para desactivar a un médico que tiene turnos futuros: confirma que se cancelen.
+  cancelarTurnosFuturos: z.boolean().optional(),
 });
 
 const actualizarMedicoSchema = z.object({
@@ -49,7 +52,7 @@ const actualizarMedicoSchema = z.object({
   // Reemplaza la lista completa de especialidades del médico (no es un
   // "agregar", es un set) — si se manda, tiene que quedar al menos una.
   especialidadesIds: z
-    .array(z.number().int().positive())
+    .array(z.number().int().positive().max(INT32_MAX))
     .min(1, 'Debe indicar al menos una especialidad')
     .optional(),
 });

@@ -42,4 +42,11 @@ function formatearFechaHora(fecha) {
   };
 }
 
-module.exports = { diaCalendarioUTC, diaSemanaYMinutosArgentina, formatearFechaHora, OFFSET_ARGENTINA_MINUTOS };
+// Día calendario (AAAA-MM-DD) de un instante visto desde Argentina. Las ausencias se
+// cargan como días de Argentina: un turno de las 22:00 de un lunes cae en UTC el martes
+// (01:00), y comparar el día UTC lo contaría contra la ausencia del día equivocado.
+function diaCalendarioArgentina(fecha) {
+  return diaCalendarioUTC(new Date(fecha).getTime() - OFFSET_ARGENTINA_MINUTOS * 60 * 1000);
+}
+
+module.exports = { diaCalendarioUTC, diaCalendarioArgentina, diaSemanaYMinutosArgentina, formatearFechaHora, OFFSET_ARGENTINA_MINUTOS };

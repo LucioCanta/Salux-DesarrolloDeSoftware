@@ -43,11 +43,21 @@ test('cambio de contraseña: la nueva tiene que cumplir la política', () => {
 });
 
 test('turno: exige medicoId entero positivo y fecha ISO futura', () => {
-  const futura = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+  const enMinutoExacto = (ms) => new Date(Math.floor((Date.now() + ms) / 60000) * 60000).toISOString();
+  const futura = enMinutoExacto(7 * 24 * 3600 * 1000);
   assert.equal(crearTurnoSchema.safeParse({ medicoId: 1, fechaYhora: futura }).success, true);
+  assert.equal(crearTurnoSchema.safeParse({ medicoId: 2147483648, fechaYhora: futura }).success, false, 'fuera del rango de la base');
   assert.equal(crearTurnoSchema.safeParse({ medicoId: 0, fechaYhora: futura }).success, false);
   assert.equal(crearTurnoSchema.safeParse({ medicoId: '1', fechaYhora: futura }).success, false);
   assert.equal(crearTurnoSchema.safeParse({ medicoId: 1, fechaYhora: 'mañana' }).success, false);
+});
+
+test('turno: exige minutos exactos y no más de un año vista', () => {
+  const base = Math.floor(Date.now() / 60000) * 60000 + 7 * 24 * 3600 * 1000;
+  assert.equal(crearTurnoSchema.safeParse({ medicoId: 1, fechaYhora: new Date(base + 1000).toISOString() }).success, false, 'con segundos');
+  assert.equal(crearTurnoSchema.safeParse({ medicoId: 1, fechaYhora: new Date(base + 1).toISOString() }).success, false, 'con milésimas');
+  assert.equal(crearTurnoSchema.safeParse({ medicoId: 1, fechaYhora: new Date(base + 400 * 24 * 3600 * 1000).toISOString() }).success, false, 'a más de un año');
+  assert.equal(crearTurnoSchema.safeParse({ medicoId: 1, fechaYhora: new Date(base + 350 * 24 * 3600 * 1000).toISOString() }).success, true, 'casi un año');
 });
 
 test('turno: una fecha pasada se rechaza', () => {

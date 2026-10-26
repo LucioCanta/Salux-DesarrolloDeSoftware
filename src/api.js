@@ -89,6 +89,8 @@ function armarError(data) {
   const error = new Error(detalleCampos || data?.message || data?.error || 'Error de conexión con el servidor');
   // Código de negocio opcional (ej: CAMBIO_CONTRASENA_REQUERIDO) para que la UI reaccione
   error.codigo = data?.codigo;
+  // Cantidad de turnos futuros que traba una operación (desactivar médico, cambiar duración)
+  error.turnosFuturos = data?.turnosFuturos;
   // Errores por campo ({ campo, mensaje }), para llevar el foco al campo afectado
   error.campos = Array.isArray(data?.errores) ? data.errores : [];
   return error;
@@ -191,8 +193,12 @@ export const api = {
   especialidades: () => request('/especialidades'),
   medicos: () => request('/medicos'),
   todosLosMedicos: () => request('/medicos/todos'),
-  cambiarEstadoMedico: (idMedico, activo) =>
-    request(`/medicos/${idMedico}/estado`, { method: 'PATCH', body: { activo } }),
+  // cancelarTurnosFuturos: confirma que se cancelen los turnos futuros del médico al desactivarlo
+  cambiarEstadoMedico: (idMedico, activo, cancelarTurnosFuturos = false) =>
+    request(`/medicos/${idMedico}/estado`, {
+      method: 'PATCH',
+      body: cancelarTurnosFuturos ? { activo, cancelarTurnosFuturos: true } : { activo },
+    }),
   misDisponibilidades: () => request('/disponibilidad/mias'),
   crearDisponibilidad: (datos) => request('/disponibilidad', { method: 'POST', body: datos }),
   eliminarDisponibilidad: (idDisponibilidad) =>

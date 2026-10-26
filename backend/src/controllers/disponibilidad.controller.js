@@ -1,5 +1,7 @@
 const prisma = require('../config/prisma');
 const { registrarError } = require('../utils/registrarError');
+const { parsearId } = require('../utils/ids');
+const { OFFSET_ARGENTINA_MINUTOS } = require('../utils/fechas');
 
 // Todas las rutas de este controller son para el médico logueado, así que
 // resolvemos su idMedico a partir del usuario del token en cada una.
@@ -65,8 +67,8 @@ const eliminarDisponibilidad = async (req, res) => {
       return res.status(403).json({ ok: false, message: 'Acceso denegado: tu perfil no es de médico' });
     }
 
-    const idDisponibilidad = parseInt(req.params.id, 10);
-    if (Number.isNaN(idDisponibilidad)) {
+    const idDisponibilidad = parsearId(req.params.id);
+    if (idDisponibilidad === null) {
       return res.status(400).json({ ok: false, message: 'id de franja horaria inválido' });
     }
 
@@ -91,8 +93,8 @@ const eliminarDisponibilidad = async (req, res) => {
 // médico puntual, para generar los horarios reales en vez de un rango fijo.
 const obtenerDisponibilidadDeMedico = async (req, res) => {
   try {
-    const medicoId = parseInt(req.params.medicoId, 10);
-    if (Number.isNaN(medicoId)) {
+    const medicoId = parsearId(req.params.medicoId);
+    if (medicoId === null) {
       return res.status(400).json({ ok: false, message: 'id de médico inválido' });
     }
 
@@ -150,7 +152,20 @@ const crearAusencia = async (req, res) => {
       },
     });
 
-    res.status(201).json({ ok: true, message: 'Ausencia registrada', data: nueva });
+    // Los turnos ya reservados dentro del rango NO se cancelan solos (podría ser un error
+    // de carga): se le avisa al médico cuántos quedaron en conflicto para que los resuelva.
+    // El rango son días de Argentina: de las 00:00 del primero a las 24:00 del último.
+    const desde = new Date(nueva.fechaInicio.getTime() + OFFSET_ARGENTINA_MINUTOS * 60 * 1000);
+    const hasta = new Date(nueva.fechaFin.getTime() + 24 * 60 * 60 * 1000 + OFFSET_ARGENTINA_MINUTOS * 60 * 1000);
+    const turnosAfectados = await prisma.turno.count({
+      where: {
+        medicoId: medico.idMedico,
+        estado: { in: ['PENDIENTE', 'CONFIRMADO'] },
+        fechaYhora: { gte: new Date(Math.max(desde.getTime(), Date.now())), lt: hasta },
+      },
+    });
+
+    res.status(201).json({ ok: true, message: 'Ausencia registrada', data: nueva, turnosAfectados });
   } catch (error) {
     registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
@@ -183,8 +198,8 @@ const eliminarAusencia = async (req, res) => {
       return res.status(403).json({ ok: false, message: 'Acceso denegado: tu perfil no es de médico' });
     }
 
-    const idAusencia = parseInt(req.params.id, 10);
-    if (Number.isNaN(idAusencia)) {
+    const idAusencia = parsearId(req.params.id);
+    if (idAusencia === null) {
       return res.status(400).json({ ok: false, message: 'id de ausencia inválido' });
     }
 
