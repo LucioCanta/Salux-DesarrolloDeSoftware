@@ -2,9 +2,11 @@
 
 API REST del sistema de gestión de turnos médicos Salux, construida con Express, Prisma y PostgreSQL.
 
+Visión general del proyecto: [README principal](../README.md) · reglas de los turnos: [`docs/REGLAS-DE-NEGOCIO.md`](../docs/REGLAS-DE-NEGOCIO.md) · arquitectura: [`docs/ARQUITECTURA.md`](../docs/ARQUITECTURA.md).
+
 ## Requisitos
 
-- Node.js 18 o superior
+- Node.js 22 o superior (la imagen de Docker usa 24)
 - PostgreSQL 14+ (local en Docker o gestionado: Supabase, Neon, etc.)
 - Docker + Docker Compose (opcional, para levantar todo con un comando)
 

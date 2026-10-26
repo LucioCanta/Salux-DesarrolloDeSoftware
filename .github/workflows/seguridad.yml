@@ -1,0 +1,49 @@
+name: Seguridad
+
+# Dos controles que no son pruebas del código propio:
+#  - revisión de dependencias: bloquea un PR que AGREGA o ACTUALIZA una dependencia con una
+#    vulnerabilidad alta o crítica conocida (no mira las que ya estaban);
+#  - CodeQL: análisis estático del código en busca de patrones inseguros (inyecciones, XSS, etc.).
+# Ambos son gratuitos en repositorios públicos.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 5 * * 1'   # los lunes: aparecen avisos nuevos aunque no haya cambios
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seguridad-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  revision-de-dependencias:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript
