@@ -72,7 +72,8 @@ Nunca se hace `git push --force` sobre `main`.
 Para que las reglas de arriba se cumplan solas, en *Settings* del repositorio:
 
 - **Branches → rule para `main`**: exigir pull request, exigir que pase el chequeo **`CI OK`** (resume todo el pipeline), y no permitir *force push* ni borrar la rama.
-- **Code security**: activar *Secret scanning*, *Push protection*, *Dependabot alerts* y, si no lo hace el workflow `seguridad.yml`, *private vulnerability reporting*.
+- **Code security**: activar *Dependency graph*, *Secret scanning*, *Push protection*, *Dependabot alerts* y, si no lo hace el workflow `seguridad.yml`, *private vulnerability reporting*.
+- **Variables de Actions**: con el Dependency graph activo, crear la variable `REVISION_DEPENDENCIAS=true` para encender la revisión de dependencias nuevas de cada PR (`seguridad.yml`).
 - **General**: activar *Automatically delete head branches*.
 - Activar la verificación en dos pasos (2FA) para todas las personas con permiso de escritura.
 

@@ -1,7 +1,8 @@
 name: Seguridad
 
 # Dos controles que no son pruebas del código propio:
-#  - revisión de dependencias: bloquea un PR que AGREGA o ACTUALIZA una dependencia con una
+#  - revisión de dependencias (VIENE APAGADA: necesita que el administrador active el Dependency graph en
+#    Settings → Code security, y después crear la variable REVISION_DEPENDENCIAS=true): bloquea un PR que AGREGA o ACTUALIZA una dependencia con una
 #    vulnerabilidad alta o crítica conocida (no mira las que ya estaban);
 #  - CodeQL: análisis estático del código en busca de patrones inseguros (inyecciones, XSS, etc.).
 # Ambos son gratuitos en repositorios públicos.
@@ -22,7 +23,9 @@ concurrency:
 
 jobs:
   revision-de-dependencias:
-    if: github.event_name == 'pull_request'
+    # Se prende creando la variable REVISION_DEPENDENCIAS=true (Settings → Secrets and variables → Actions →
+    # Variables) una vez activado el Dependency graph; sin él la acción falla siempre.
+    if: ${{ github.event_name == 'pull_request' && vars.REVISION_DEPENDENCIAS == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
