@@ -1,3 +1,5 @@
+* text=auto
+
 # Los scripts que corren dentro de contenedores Linux necesitan finales de línea LF.
 # Sin esto, Git en Windows los baja con CRLF y fallan ("/bin/sh^M: bad interpreter").
 *.sh text eol=lf
