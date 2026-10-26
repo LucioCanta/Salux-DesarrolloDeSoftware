@@ -11,7 +11,14 @@ const crearDisponibilidadSchema = z
     path: ['horaFinMinutos'],
   });
 
-const fechaSoloDia = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD');
+// Además del formato, el día tiene que existir ("2027-02-31" tiene formato válido pero no existe).
+const fechaSoloDia = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD')
+  .refine((valor) => {
+    const fecha = new Date(`${valor}T00:00:00Z`);
+    return !Number.isNaN(fecha.getTime()) && fecha.toISOString().slice(0, 10) === valor;
+  }, 'Esa fecha no existe en el calendario');
 
 const crearAusenciaSchema = z
   .object({

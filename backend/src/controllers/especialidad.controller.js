@@ -1,5 +1,6 @@
 const prisma = require('../config/prisma');
 const { registrarError } = require('../utils/registrarError');
+const { parsearId } = require('../utils/ids');
 
 const crearEspecialidad = async (req, res) => {
   try {
@@ -71,8 +72,8 @@ const obtenerEspecialidades = async (req, res) => {
 
 const eliminarEspecialidad = async (req, res) => {
   try {
-    const idEspecialidad = parseInt(req.params.id, 10);
-    if (Number.isNaN(idEspecialidad)) {
+    const idEspecialidad = parsearId(req.params.id);
+    if (idEspecialidad === null) {
       return res.status(400).json({ ok: false, message: 'id de especialidad inválido' });
     }
 

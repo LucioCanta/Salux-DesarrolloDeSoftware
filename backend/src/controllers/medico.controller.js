@@ -1,7 +1,10 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../config/prisma');
-const { diaCalendarioUTC, OFFSET_ARGENTINA_MINUTOS } = require('../utils/fechas');
+const { diaCalendarioUTC, formatearFechaHora, OFFSET_ARGENTINA_MINUTOS } = require('../utils/fechas');
 const { registrarError } = require('../utils/registrarError');
+const { segundoPlano } = require('../utils/segundoPlano');
+const { parsearId } = require('../utils/ids');
+const { emailTurnoCancelado } = require('../utils/email');
 
 const MINUTOS_ANTICIPACION = 60;
 const LIMITE_DIAS_PROXIMA_DISPONIBILIDAD = 30;
@@ -66,6 +69,19 @@ async function calcularProximaDisponibilidad(medico) {
   }
 
   return null;
+}
+
+// Turnos de un médico que todavía no ocurrieron y siguen vivos (pendientes o confirmados).
+function turnosFuturosVivos(idMedico) {
+  return prisma.turno.findMany({
+    where: { medicoId: idMedico, estado: { in: ['PENDIENTE', 'CONFIRMADO'] }, fechaYhora: { gte: new Date() } },
+    select: {
+      idTurno: true,
+      fechaYhora: true,
+      paciente: { select: { usuario: { select: { email: true, nomYape: true } } } },
+      medico: { select: { usuario: { select: { nomYape: true } } } },
+    },
+  });
 }
 
 const crearMedico = async (req, res) => {
@@ -149,7 +165,9 @@ const crearMedico = async (req, res) => {
 const obtenerMedicos = async (req, res) => {
   try {
     const medicos = await prisma.medico.findMany({
-      where: { usuario: { activo: true } },
+      // Un médico sin ninguna especialidad activa no se puede reservar (crearTurno lo
+      // rechaza), así que tampoco se ofrece.
+      where: { usuario: { activo: true }, especialidades: { some: { activo: true } } },
       include: {
         // Traemos los datos del usuario, pero seleccionamos qué campos mostrar por seguridad
         // Este listado lo ve cualquier usuario logueado (incluidos pacientes):
@@ -160,8 +178,8 @@ const obtenerMedicos = async (req, res) => {
             activo: true
           }
         },
-        // Traemos las especialidades vinculadas
-        especialidades: true,
+        // Solo las especialidades vigentes: una dada de baja no se ofrece para reservar
+        especialidades: { where: { activo: true } },
         disponibilidades: true,
         ausencias: true,
       }
@@ -223,28 +241,64 @@ const obtenerTodosLosMedicos = async (req, res) => {
 // el mismo que ya usan login/verificarToken para bloquear el acceso).
 const cambiarEstadoMedico = async (req, res) => {
   try {
-    const idMedico = parseInt(req.params.id, 10);
-    if (Number.isNaN(idMedico)) {
+    const idMedico = parsearId(req.params.id);
+    if (idMedico === null) {
       return res.status(400).json({ ok: false, message: 'id de médico inválido' });
     }
-    const { activo } = req.body;
+    const { activo, cancelarTurnosFuturos } = req.body;
 
     const medico = await prisma.medico.findUnique({ where: { idMedico }, select: { usuarioId: true } });
     if (!medico) {
       return res.status(404).json({ ok: false, message: 'Médico no encontrado' });
     }
 
-    const usuario = await prisma.usuario.update({
-      where: { idUsuario: medico.usuarioId },
-      data: { activo },
-      select: { idUsuario: true, activo: true }
+    // Desactivar a un médico con turnos futuros vivos los dejaría colgados: él ya no puede
+    // entrar a confirmarlos ni finalizarlos y los pacientes irían a una cita que no existe.
+    // Hay que confirmarlo explícitamente: se cancelan y se avisa a cada paciente.
+    let turnosACancelar = [];
+    if (activo === false) {
+      turnosACancelar = await turnosFuturosVivos(idMedico);
+      if (turnosACancelar.length > 0 && !cancelarTurnosFuturos) {
+        return res.status(409).json({
+          ok: false,
+          message: `Este médico tiene ${turnosACancelar.length} turno(s) futuro(s) sin cerrar. Si lo desactivás se van a cancelar y se avisará a los pacientes`,
+          turnosFuturos: turnosACancelar.length,
+        });
+      }
+    }
+
+    const usuario = await prisma.$transaction(async (tx) => {
+      if (turnosACancelar.length > 0) {
+        // Se vuelve a exigir que sigan vivos: si alguno cambió en el medio, no se pisa.
+        await tx.turno.updateMany({
+          where: { idTurno: { in: turnosACancelar.map((t) => t.idTurno) }, estado: { in: ['PENDIENTE', 'CONFIRMADO'] } },
+          data: { estado: 'CANCELADO' },
+        });
+      }
+      return tx.usuario.update({
+        where: { idUsuario: medico.usuarioId },
+        data: { activo },
+        select: { idUsuario: true, activo: true }
+      });
     });
 
     res.json({
       ok: true,
       message: `Médico ${activo ? 'activado' : 'desactivado'} con éxito`,
-      data: usuario
+      data: usuario,
+      ...(activo === false ? { turnosCancelados: turnosACancelar.length } : {}),
     });
+
+    for (const t of turnosACancelar) {
+      const { fechaTexto, horaTexto } = formatearFechaHora(t.fechaYhora);
+      segundoPlano(emailTurnoCancelado({
+        to: t.paciente.usuario.email,
+        nombrePaciente: t.paciente.usuario.nomYape,
+        nombreMedico: t.medico.usuario.nomYape,
+        fechaTexto,
+        horaTexto,
+      }));
+    }
   } catch (error) {
     registrarError(error);
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
@@ -255,14 +309,31 @@ const cambiarEstadoMedico = async (req, res) => {
 // Los datos de identidad (nombre, email, dni, matrícula) no se tocan acá.
 const actualizarMedico = async (req, res) => {
   try {
-    const idMedico = parseInt(req.params.id, 10);
-    if (Number.isNaN(idMedico)) {
+    const idMedico = parsearId(req.params.id);
+    if (idMedico === null) {
       return res.status(400).json({ ok: false, message: 'id de médico inválido' });
     }
 
     const { consultorio, duracionTurnoMinutos, especialidadesIds } = req.body;
     if (consultorio === undefined && duracionTurnoMinutos === undefined && especialidadesIds === undefined) {
       return res.status(400).json({ ok: false, message: 'No se envió ningún campo para actualizar' });
+    }
+
+    // Los turnos ya reservados duran lo que dura un turno HOY de este médico: si se acorta
+    // con turnos futuros cargados, el que ocupaba 60 minutos pasaría a ocupar 30 y el
+    // sistema dejaría reservar encima de él. Primero hay que cerrar o cancelar esos turnos.
+    if (duracionTurnoMinutos !== undefined) {
+      const actual = await prisma.medico.findUnique({ where: { idMedico }, select: { duracionTurnoMinutos: true } });
+      if (actual && actual.duracionTurnoMinutos !== duracionTurnoMinutos) {
+        const pendientes = (await turnosFuturosVivos(idMedico)).length;
+        if (pendientes > 0) {
+          return res.status(409).json({
+            ok: false,
+            message: `No se puede cambiar la duración del turno: el médico tiene ${pendientes} turno(s) futuro(s) reservado(s). Cancelalos o esperá a que se cierren`,
+            turnosFuturos: pendientes,
+          });
+        }
+      }
     }
 
     const medico = await prisma.medico.update({
