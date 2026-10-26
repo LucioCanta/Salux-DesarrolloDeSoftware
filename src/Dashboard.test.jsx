@@ -467,6 +467,33 @@ describe('administrador', () => {
       expect(await within(fila).findByText('Inactivo')).toBeInTheDocument()
     })
 
+    it('si el médico tiene turnos futuros pide confirmación y recién entonces los cancela', async () => {
+      const user = await abrirMedicos()
+      const conTurnos = Object.assign(new Error('Este médico tiene 2 turno(s) futuro(s) sin cerrar'), { turnosFuturos: 2 })
+      api.cambiarEstadoMedico.mockRejectedValueOnce(conTurnos).mockResolvedValueOnce({})
+      const fila = within(screen.getByRole('table')).getByText('Dra. Corazón').closest('tr')
+      await user.click(within(fila).getByRole('button', { name: 'Desactivar' }))
+
+      const dialogo = await screen.findByRole('alertdialog', { name: /Desactivar y cancelar/ })
+      expect(within(dialogo).getByText(/2 turno[(]s[)] futuro[(]s[)]/)).toBeInTheDocument()
+      expect(within(fila).getByText('Activo')).toBeInTheDocument()
+
+      await user.click(within(dialogo).getByRole('button', { name: 'Sí, desactivar y cancelar' }))
+      expect(api.cambiarEstadoMedico).toHaveBeenLastCalledWith(10, false, true)
+      expect(await within(fila).findByText('Inactivo')).toBeInTheDocument()
+    })
+
+    it('"Volver" en la confirmación no desactiva a nadie', async () => {
+      const user = await abrirMedicos()
+      api.cambiarEstadoMedico.mockRejectedValueOnce(Object.assign(new Error('x'), { turnosFuturos: 1 }))
+      const fila = within(screen.getByRole('table')).getByText('Dra. Corazón').closest('tr')
+      await user.click(within(fila).getByRole('button', { name: 'Desactivar' }))
+      await user.click(await screen.findByRole('button', { name: 'Volver' }))
+
+      expect(api.cambiarEstadoMedico).toHaveBeenCalledTimes(1)
+      expect(within(fila).getByText('Activo')).toBeInTheDocument()
+    })
+
     it('activar a un médico inactivo lo reactiva', async () => {
       const user = await abrirMedicos()
       api.cambiarEstadoMedico.mockResolvedValue({})
@@ -701,6 +728,20 @@ describe('médico', () => {
       expect(await screen.findByText(/10\/04\/2026 a 12\/04\/2026/)).toBeInTheDocument()
       expect(desde).toHaveValue('')
       expect(screen.getByPlaceholderText('Ej: Vacaciones')).toHaveValue('')
+    })
+
+    it('avisa cuántos turnos ya reservados quedaron dentro de la ausencia', async () => {
+      api.crearAusencia.mockResolvedValue({
+        data: { idAusencia: 9, fechaInicio: '2026-04-10T00:00:00.000Z', fechaFin: '2026-04-12T00:00:00.000Z', motivo: null },
+        turnosAfectados: 3,
+      })
+      const user = await abrirDisponibilidad()
+      const [desde, hasta] = document.querySelectorAll('input[type="date"]')
+      await user.type(desde, '2026-04-10')
+      await user.type(hasta, '2026-04-12')
+      await user.click(screen.getByRole('button', { name: '+ Agregar ausencia' }))
+
+      expect(await screen.findByText(/tenés 3 turno[(]s[)] ya reservado[(]s[)]/)).toBeInTheDocument()
     })
 
     it('muestra el error del servidor (por ejemplo, fechas invertidas)', async () => {

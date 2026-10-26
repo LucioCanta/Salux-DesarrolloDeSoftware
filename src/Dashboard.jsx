@@ -307,14 +307,24 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const toggleEstadoMedico = async (medico) => {
+  // Desactivar a un médico con turnos futuros pide confirmación: el servidor responde 409
+  // con la cantidad y recién con el "sí" se cancelan esos turnos (y se avisa a los pacientes).
+  const [confirmacionDesactivarMedico, setConfirmacionDesactivarMedico] = useState(null);
+
+  const toggleEstadoMedico = async (medico, cancelarTurnosFuturos = false) => {
     const nuevoEstado = !medico.usuario.activo;
     try {
-      await api.cambiarEstadoMedico(medico.idMedico, nuevoEstado);
+      await (cancelarTurnosFuturos
+        ? api.cambiarEstadoMedico(medico.idMedico, nuevoEstado, true)
+        : api.cambiarEstadoMedico(medico.idMedico, nuevoEstado));
       setMedicosAdmin(prev => prev.map(m =>
         m.idMedico === medico.idMedico ? { ...m, usuario: { ...m.usuario, activo: nuevoEstado } } : m
       ));
     } catch (err) {
+      if (err.turnosFuturos > 0 && !cancelarTurnosFuturos) {
+        setConfirmacionDesactivarMedico({ medico, cantidad: err.turnosFuturos });
+        return;
+      }
       alert(`No se pudo cambiar el estado del médico: ${err.message}`);
     }
   };
@@ -409,6 +419,7 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   const [nuevaAusenciaMotivo, setNuevaAusenciaMotivo] = useState('');
   const [guardandoAusencia, setGuardandoAusencia] = useState(false);
   const [errorNuevaAusencia, setErrorNuevaAusencia] = useState('');
+  const [avisoAusencia, setAvisoAusencia] = useState('');
 
   useEffect(() => {
     if (!esMedico) return;
@@ -422,9 +433,10 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
   const agregarAusencia = async (e) => {
     e.preventDefault();
     setErrorNuevaAusencia('');
+    setAvisoAusencia('');
     setGuardandoAusencia(true);
     try {
-      const { data } = await api.crearAusencia({
+      const { data, turnosAfectados } = await api.crearAusencia({
         fechaInicio: nuevaAusenciaDesde,
         fechaFin: nuevaAusenciaHasta,
         motivo: nuevaAusenciaMotivo,
@@ -433,6 +445,9 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
       setNuevaAusenciaDesde('');
       setNuevaAusenciaHasta('');
       setNuevaAusenciaMotivo('');
+      if (turnosAfectados > 0) {
+        setAvisoAusencia(`Ojo: tenés ${turnosAfectados} turno(s) ya reservado(s) en esas fechas. No se cancelaron solos: revisalos en «Mi agenda» y cancelalos o avisá a los pacientes.`);
+      }
     } catch (err) {
       setErrorNuevaAusencia(err.message);
     } finally {
@@ -1421,6 +1436,11 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
                   {errorNuevaAusencia}
                 </div>
               )}
+              {avisoAusencia && (
+                <div role="status" className={`px-4 py-3 rounded-lg border text-sm ${altoContraste ? 'border-black text-black' : 'border-amber-500/40 bg-amber-500/10 text-amber-200'}`}>
+                  {avisoAusencia}
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label htmlFor="ausencia-desde" className={`block text-xs font-semibold uppercase tracking-wider ${textoEnTarjeta} mb-1`}>Desde</label>
@@ -1836,6 +1856,19 @@ function Dashboard({ usuario, onLogout, onUsuarioActualizado }) {
         >
           {confirmacionCancelacion.descripcion}.
           Esta acción no se puede deshacer; si cambiás de idea tendrías que reservar un turno nuevo.
+        </DialogoConfirmacion>
+      )}
+
+      {confirmacionDesactivarMedico && (
+        <DialogoConfirmacion
+          titulo="¿Desactivar y cancelar sus turnos?"
+          textoVolver="Volver"
+          textoConfirmar="Sí, desactivar y cancelar"
+          onVolver={() => setConfirmacionDesactivarMedico(null)}
+          onConfirmar={() => { toggleEstadoMedico(confirmacionDesactivarMedico.medico, true); setConfirmacionDesactivarMedico(null); }}
+        >
+          {confirmacionDesactivarMedico.medico.usuario.nomYape} tiene {confirmacionDesactivarMedico.cantidad} turno(s) futuro(s) sin cerrar.
+          Al desactivarlo se cancelan y cada paciente recibe un correo de aviso. Esta acción no se puede deshacer.
         </DialogoConfirmacion>
       )}
 
