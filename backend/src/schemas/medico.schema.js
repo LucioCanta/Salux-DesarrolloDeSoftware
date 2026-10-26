@@ -21,7 +21,7 @@ const crearMedicoSchema = z.object({
       .optional()
   ),
   especialidadesIds: z
-    .array(z.number().int().positive().max(INT32_MAX))
+    .array(z.number().int().positive().max(INT32_MAX)).max(50, 'Demasiadas especialidades')
     .min(1, 'Debe indicar al menos una especialidad'),
   // Cuánto dura cada turno de este médico. Opcional: si no se manda, Prisma
   // usa el default de 30 minutos.
@@ -52,7 +52,7 @@ const actualizarMedicoSchema = z.object({
   // Reemplaza la lista completa de especialidades del médico (no es un
   // "agregar", es un set) — si se manda, tiene que quedar al menos una.
   especialidadesIds: z
-    .array(z.number().int().positive().max(INT32_MAX))
+    .array(z.number().int().positive().max(INT32_MAX)).max(50, 'Demasiadas especialidades')
     .min(1, 'Debe indicar al menos una especialidad')
     .optional(),
 });
