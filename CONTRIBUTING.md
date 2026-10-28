@@ -58,7 +58,7 @@ Nunca se hace `git push --force` sobre `main`.
 
 - Los cambios de esquema se hacen en `backend/prisma/schema.prisma` y se generan con `npm run db:migrate:dev` (nombre en español, descriptivo).
 - **Migraciones aditivas**: columnas nuevas nulas o con valor por defecto. Sirven para que el código viejo siga andando con la base ya migrada.
-- **Orden de despliegue**: primero la migración en producción, después el merge a `main` (ver [`DEPLOY.md`](DEPLOY.md)). El pipeline avisa en el PR cuando hay migraciones nuevas.
+- **Orden de despliegue**: primero la migración en producción, después el merge a `main` (ver [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md)). El pipeline avisa en el PR cuando hay migraciones nuevas.
 - Nunca se edita una migración que ya está en `main`: se agrega otra.
 
 ## Seguridad

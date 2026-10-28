@@ -164,7 +164,7 @@ jobs:
         run: |
           nuevas=$(git diff --name-only --diff-filter=A "origin/${{ github.base_ref }}...HEAD" -- prisma/migrations | grep migration.sql || true)
           if [ -n "$nuevas" ]; then
-            echo "::warning title=Este PR trae migraciones::Antes de mergear, aplicalas en producción (npx prisma migrate deploy). Orden: primero la base, después el merge. Ver DEPLOY.md."
+            echo "::warning title=Este PR trae migraciones::Antes de mergear, aplicalas en producción (npx prisma migrate deploy). Orden: primero la base, después el merge. Ver docs/DESPLIEGUE.md."
             echo "$nuevas"
           fi
 

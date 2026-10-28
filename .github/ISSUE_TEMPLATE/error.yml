@@ -1,6 +1,6 @@
 name: Error
 description: Algo no funciona como debería
-labels: [error]
+labels: [bug]
 body:
   - type: markdown
     attributes:

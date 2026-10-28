@@ -18,7 +18,7 @@ Vercel Cron ──► /api/cron/mantenimiento (1 vez por día)
 1. Entrá a <https://supabase.com> → **New project**.
    - **Region:** South America (São Paulo) (la más cercana a Argentina; Vercel está configurado en `gru1`, también São Paulo).
    - **Database password:** una larga y aleatoria. Guardala.
-2. Cuando el proyecto esté listo, abrí **SQL Editor → New query**, pegá el contenido de [`backend/prisma/supabase-setup.sql`](backend/prisma/supabase-setup.sql), **cambiá la contraseña** del rol `salux_app` y ejecutalo. Crea el rol propio de la app (sin superusuario).
+2. Cuando el proyecto esté listo, abrí **SQL Editor → New query**, pegá el contenido de [`backend/prisma/supabase-setup.sql`](../backend/prisma/supabase-setup.sql), **cambiá la contraseña** del rol `salux_app` y ejecutalo. Crea el rol propio de la app (sin superusuario).
 3. En **Project Settings → Database → Connection string** (botón *Connect*) copiá dos cadenas y reemplazá usuario y contraseña por los del rol `salux_app` (el usuario del pooler es `salux_app.<id-del-proyecto>`):
 
    | Variable | Cadena | Para qué |
@@ -149,7 +149,7 @@ Si la carpeta del proyecto está dentro de OneDrive (`C:\Users\…\OneDrive\…`
 > OneDrive conserva el **historial de versiones** y la papelera durante semanas. Por eso rotar los secretos de producción (6.1 a 6.3) es obligatorio aunque borres la carpeta: considerá comprometidos los valores que estuvieron ahí.
 
 ## 7. Respaldos
-Guía completa, con las claves y el paso a paso: [`backend/scripts/respaldo/README.md`](backend/scripts/respaldo/README.md).
+Guía completa, con las claves y el paso a paso: [`backend/scripts/respaldo/README.md`](../backend/scripts/respaldo/README.md).
 
 - `bash backend/scripts/respaldo/respaldar.sh supabase` genera un respaldo **cifrado** de producción (necesita `RESPALDO_DATABASE_URL`).
 - `restaurar.sh` lo restaura en una base nueva para comprobar que sirve. **Probalo al menos una vez.**

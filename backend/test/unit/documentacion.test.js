@@ -10,15 +10,15 @@ const RAIZ = path.join(__dirname, '..', '..', '..');
 const leer = (ruta) => fs.readFileSync(path.join(RAIZ, ruta), 'utf8');
 
 const DOCUMENTOS = [
-  'README.md', 'CONTRIBUTING.md', 'SECURITY.md', 'DEPLOY.md',
-  'docs/ARQUITECTURA.md', 'docs/REGLAS-DE-NEGOCIO.md',
+  'README.md', 'CONTRIBUTING.md', 'SECURITY.md', 'docs/DESPLIEGUE.md',
+  'docs/ARQUITECTURA.md', 'docs/REGLAS-DE-NEGOCIO.md', 'docs/README.md',
   'backend/README.md', 'backend/scripts/respaldo/README.md',
 ];
 
 test.describe('documentación', () => {
   test('existen los archivos que un repositorio profesional tiene que tener', () => {
     for (const ruta of [
-      'README.md', 'CONTRIBUTING.md', 'SECURITY.md', 'DEPLOY.md', 'docs/ARQUITECTURA.md', 'docs/REGLAS-DE-NEGOCIO.md',
+      'README.md', 'CONTRIBUTING.md', 'SECURITY.md', 'docs/DESPLIEGUE.md', 'docs/ARQUITECTURA.md', 'docs/REGLAS-DE-NEGOCIO.md', 'docs/README.md',
       '.github/PULL_REQUEST_TEMPLATE.md', '.github/ISSUE_TEMPLATE/error.yml', '.github/ISSUE_TEMPLATE/mejora.yml',
       '.github/ISSUE_TEMPLATE/config.yml', '.github/dependabot.yml', '.editorconfig', '.nvmrc',
     ]) {
@@ -41,7 +41,7 @@ test.describe('documentación', () => {
 
   test('el README raíz enlaza a cada documento principal', () => {
     const readme = leer('README.md');
-    for (const ruta of ['docs/ARQUITECTURA.md', 'docs/REGLAS-DE-NEGOCIO.md', 'DEPLOY.md', 'CONTRIBUTING.md', 'SECURITY.md', 'backend/README.md']) {
+    for (const ruta of ['docs/ARQUITECTURA.md', 'docs/REGLAS-DE-NEGOCIO.md', 'docs/README.md', 'docs/DESPLIEGUE.md', 'CONTRIBUTING.md', 'SECURITY.md', 'backend/README.md']) {
       assert.ok(readme.includes(`(${ruta}`), `el README no enlaza a ${ruta}`);
     }
   });

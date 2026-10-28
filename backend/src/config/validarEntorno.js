@@ -22,7 +22,7 @@ function validarEntorno(env = process.env) {
   if (produccion) {
     // La app no debería conectarse con el superusuario de la base
     if (/^postgres(ql)?:\/\/postgres[.:@]/i.test(env.DATABASE_URL || '')) {
-      avisos.push('DATABASE_URL usa el usuario "postgres" (superusuario): conviene un rol propio de la app (ver DEPLOY.md)');
+      avisos.push('DATABASE_URL usa el usuario "postgres" (superusuario): conviene un rol propio de la app (ver docs/DESPLIEGUE.md)');
     }
     if (!/^postgres(ql)?:\/\//i.test(env.DATABASE_URL || '')) {
       errores.push('DATABASE_URL tiene que ser una conexión PostgreSQL (postgresql://...)');

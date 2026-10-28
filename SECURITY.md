@@ -16,7 +16,7 @@ Qué esperar: acuse de recibo en pocos días hábiles, una evaluación y, si cor
 
 ## Alcance
 
-Está dentro del alcance todo lo de este repositorio y la aplicación desplegada: autenticación y sesiones, control de acceso entre roles (paciente, médico, administrador), exposición de datos personales, inyecciones, y configuración de la infraestructura descrita en [`DEPLOY.md`](DEPLOY.md).
+Está dentro del alcance todo lo de este repositorio y la aplicación desplegada: autenticación y sesiones, control de acceso entre roles (paciente, médico, administrador), exposición de datos personales, inyecciones, y configuración de la infraestructura descrita en [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md).
 
 Fuera de alcance: ataques de denegación de servicio por volumen, ingeniería social contra el equipo y vulnerabilidades de los proveedores (Vercel, Supabase, Brevo), que deben reportarse a ellos.
 
