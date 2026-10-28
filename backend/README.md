@@ -186,7 +186,7 @@ Los emails no se envían en los tests (sin SMTP solo se registran en consola).
 
 ## Despliegue en producción
 
-> Para publicar en **Vercel + Supabase** seguí la guía paso a paso: [`DEPLOY.md`](../DEPLOY.md). Lo de abajo es el resumen genérico para otro hosting.
+> Para publicar en **Vercel + Supabase** seguí la guía paso a paso: [`docs/DESPLIEGUE.md`](../docs/DESPLIEGUE.md). Lo de abajo es el resumen genérico para otro hosting.
 
 1. Configurá las variables de entorno en la plataforma elegida (Render, Railway, Fly.io, etc.), incluyendo `DATABASE_URL` apuntando a tu PostgreSQL gestionado y `CORS_ORIGIN` con el dominio real del frontend.
 2. Comando de build: `npm install` (ejecuta `prisma generate` automáticamente).

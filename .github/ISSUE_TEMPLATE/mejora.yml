@@ -1,6 +1,6 @@
 name: Mejora o funcionalidad nueva
 description: Una idea para que Salux resuelva algo mejor
-labels: [mejora]
+labels: [enhancement]
 body:
   - type: textarea
     id: problema

@@ -80,13 +80,25 @@ Guía completa del backend (variables, Docker endurecido, tests de integración)
 | `npm run lint` · `npm run build` | Lint y compilación |
 | `cd backend && npm test` | Pruebas del backend (unitarias + integración; necesita la base de Docker) |
 
+## Mapa del repositorio
+
+```
+src/            Frontend (React): pantallas, modales y cliente de la API
+e2e/            Pruebas de accesibilidad en navegador real (Playwright + axe)
+api/            Entrada de la API en Vercel (reutiliza backend/src/app.js)
+backend/        API (Express + Prisma): código, migraciones, pruebas y scripts
+docs/           Documentación del proyecto (índice en docs/README.md)
+.github/        Pipelines de CI, plantillas de pull request e issues, Dependabot
+```
+
 ## Documentación
 
 | Documento | Contenido |
 |---|---|
+| [`docs/README.md`](docs/README.md) | Índice de toda la documentación, por tema |
 | [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) | Componentes, modelo de datos, flujo de reserva y decisiones de diseño |
 | [`docs/REGLAS-DE-NEGOCIO.md`](docs/REGLAS-DE-NEGOCIO.md) | Reglas de los turnos, estados permitidos y respuestas de la API |
-| [`DEPLOY.md`](DEPLOY.md) | Publicar en Supabase + Vercel + Brevo, secretos, respaldos y checklist de plataformas |
+| [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md) | Publicar en Supabase + Vercel + Brevo, secretos, respaldos y checklist de plataformas |
 | [`backend/scripts/respaldo/README.md`](backend/scripts/respaldo/README.md) | Respaldos cifrados de la base y cómo restaurarlos |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Cómo colaborar: ramas, commits, pull requests y revisión |
 | [`SECURITY.md`](SECURITY.md) | Cómo reportar una vulnerabilidad y qué medidas hay implementadas |

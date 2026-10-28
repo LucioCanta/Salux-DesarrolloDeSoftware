@@ -23,7 +23,7 @@
 ## Base de datos (completar solo si hay migraciones)
 
 - [ ] La migración es **aditiva** (el código viejo sigue andando con la base ya migrada)
-- [ ] Orden de despliegue: **primero** `prisma migrate deploy` en producción, **después** el merge (ver `DEPLOY.md`)
+- [ ] Orden de despliegue: **primero** `prisma migrate deploy` en producción, **después** el merge (ver `docs/DESPLIEGUE.md`)
 
 ## Riesgos y cosas a mirar en la revisión
 

@@ -15,6 +15,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# Material interno del equipo (guías de estudio, presentación): no va al repositorio público
+interno/
+
 # Claude Code local tooling (worktrees de agentes, etc.)
 .claude/
 
